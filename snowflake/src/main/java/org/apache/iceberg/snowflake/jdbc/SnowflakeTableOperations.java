@@ -19,21 +19,18 @@
 package org.apache.iceberg.snowflake.jdbc;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
+import java.util.List;
 import java.util.Map;
 import org.apache.iceberg.BaseMetastoreTableOperations;
-import org.apache.iceberg.CatalogProperties;
-import org.apache.iceberg.CatalogUtil;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.io.FileIO;
+import org.apache.iceberg.jdbc.JdbcClientPool;
 import org.apache.iceberg.jdbc.UncheckedInterruptedException;
 import org.apache.iceberg.jdbc.UncheckedSQLException;
 import org.apache.iceberg.relocated.com.google.common.base.Preconditions;
+import org.apache.iceberg.relocated.com.google.common.collect.Lists;
 import org.apache.iceberg.util.JsonUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,18 +43,20 @@ class SnowflakeTableOperations extends BaseMetastoreTableOperations {
   private FileIO fileIO;
   private final TableIdentifier tableIdentifier;
 
-  private Object configuration;
+  private JdbcClientPool connections;
 
   private final Map<String, String> catalogProperties;
 
   protected SnowflakeTableOperations(
+      JdbcClientPool connections,
+      FileIO fileIO,
       Map<String, String> properties,
       String catalogName,
-      Object configs,
       TableIdentifier tableIdentifier) {
+    this.connections = connections;
+    this.fileIO = fileIO;
     this.catalogProperties = properties;
     this.catalogName = catalogName;
-    this.configuration = configs;
     this.tableIdentifier = tableIdentifier;
   }
 
@@ -67,6 +66,7 @@ class SnowflakeTableOperations extends BaseMetastoreTableOperations {
 
     String location = null;
     try {
+      LOG.debug("Getting metadata location for table {}", tableName());
       location = getTableMetadataLocation();
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
@@ -106,14 +106,7 @@ class SnowflakeTableOperations extends BaseMetastoreTableOperations {
 
   @Override
   public FileIO io() {
-
-    String fileIOImpl = SnowflakeUtils.DEFAULT_FILE_IO_IMPL;
-
-    if (null != catalogProperties.get(CatalogProperties.FILE_IO_IMPL)) {
-      fileIOImpl = catalogProperties.get(CatalogProperties.FILE_IO_IMPL);
-    }
-
-    return CatalogUtil.loadFileIO(fileIOImpl, catalogProperties, configuration);
+    return fileIO;
   }
 
   @Override
@@ -123,20 +116,19 @@ class SnowflakeTableOperations extends BaseMetastoreTableOperations {
 
   private String getTableMetadataLocation()
       throws UncheckedSQLException, SQLException, InterruptedException {
+    List<String> metadataLocations = Lists.newArrayList();
+    metadataLocations.addAll(
+        SnowflakeUtils.fetch(
+            connections,
+            row -> row.getString(1),
+            String.format(SnowflakeUtils.METADATA_LOCATION_QUERY, tableName())));
 
-    Connection connection =
-        DriverManager.getConnection(catalogProperties.get(CatalogProperties.URI));
-    Statement st = connection.createStatement();
-    ResultSet results =
-        st.executeQuery(String.format(SnowflakeUtils.METADATA_LOCATION_QUERY, tableName()));
+    Preconditions.checkState(
+        metadataLocations.size() == 1,
+        "Expected a single metadata location for table : %s, actual location count %d ",
+        tableIdentifier,
+        metadataLocations.size());
 
-    String locationJson = null;
-    while (results.next()) {
-      locationJson = results.getString(1);
-    }
-    results.close();
-    st.close();
-
-    return getMetadataLocationFromJson(locationJson);
+    return getMetadataLocationFromJson(metadataLocations.get(0));
   }
 }
