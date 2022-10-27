@@ -690,8 +690,12 @@ project(':iceberg-snowflake') {
     implementation project(':iceberg-aws')
     implementation "com.fasterxml.jackson.core:jackson-databind"
     implementation "com.fasterxml.jackson.core:jackson-core"
+    implementation "commons-dbutils:commons-dbutils:1.7"
 
     runtimeOnly("net.snowflake:snowflake-jdbc:3.13.22")
+
+    testImplementation "org.xerial:sqlite-jdbc"
+    testImplementation project(path: ':iceberg-core', configuration: 'testArtifacts')
   }
 }
 

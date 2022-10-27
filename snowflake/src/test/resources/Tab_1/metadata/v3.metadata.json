@@ -1,0 +1,45 @@
+{
+  "format-version" : 2,
+  "table-uuid" : "87bc996b-b428-43b9-99fa-7ef7440aaf21",
+  "location" : "tab_1/",
+  "last-sequence-number" : 1,
+  "last-updated-ms" : 1666809646411,
+  "last-column-id" : 2,
+  "current-schema-id" : 0,
+  "schemas" : [ {
+    "type" : "struct",
+    "schema-id" : 0,
+    "fields" : [ {
+      "id" : 1,
+      "name" : "GENDER",
+      "required" : false,
+      "type" : "string"
+    }, {
+      "id" : 2,
+      "name" : "DESCRIPTION",
+      "required" : false,
+      "type" : "string"
+    } ]
+  } ],
+  "default-spec-id" : 0,
+  "partition-specs" : [ {
+    "spec-id" : 0,
+    "fields" : [ ]
+  } ],
+  "last-partition-id" : 999,
+  "default-sort-order-id" : 0,
+  "sort-orders" : [ {
+    "order-id" : 0,
+    "fields" : [ ]
+  } ],
+  "properties" : {
+    "format-version" : "2"
+  },
+  "current-snapshot-id" : 1666809646411000000,
+  "snapshots" : [ {
+    "sequence-number" : 1,
+    "snapshot-id" : 1666809646411000000,
+    "timestamp-ms" : 1666809646411,
+    "manifest-list" : "tab_1/metadata/snap-1666809646411000000.avro"
+  } ]
+}

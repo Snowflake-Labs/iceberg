@@ -16,21 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.iceberg.snowflake.jdbc;
+package org.apache.iceberg.snowflake;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.sql.SQLException;
-import java.util.List;
 import java.util.Map;
 import org.apache.iceberg.BaseMetastoreTableOperations;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.io.FileIO;
-import org.apache.iceberg.jdbc.JdbcClientPool;
 import org.apache.iceberg.jdbc.UncheckedInterruptedException;
 import org.apache.iceberg.jdbc.UncheckedSQLException;
 import org.apache.iceberg.relocated.com.google.common.base.Preconditions;
-import org.apache.iceberg.relocated.com.google.common.collect.Lists;
+import org.apache.iceberg.snowflake.entities.SnowflakeTableMetadata;
 import org.apache.iceberg.util.JsonUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,17 +41,17 @@ class SnowflakeTableOperations extends BaseMetastoreTableOperations {
   private FileIO fileIO;
   private final TableIdentifier tableIdentifier;
 
-  private JdbcClientPool connections;
+  private QueryFactory queryFactory;
 
   private final Map<String, String> catalogProperties;
 
   protected SnowflakeTableOperations(
-      JdbcClientPool connections,
+      QueryFactory queryFactory,
       FileIO fileIO,
       Map<String, String> properties,
       String catalogName,
       TableIdentifier tableIdentifier) {
-    this.connections = connections;
+    this.queryFactory = queryFactory;
     this.fileIO = fileIO;
     this.catalogProperties = properties;
     this.catalogName = catalogName;
@@ -101,7 +99,7 @@ class SnowflakeTableOperations extends BaseMetastoreTableOperations {
   }
 
   static String getMetadataLocationFromJson(JsonNode json) {
-    return JsonUtil.getString(SnowflakeUtils.METADATA_LOCATION, json);
+    return JsonUtil.getString(SnowflakeResources.METADATA_LOCATION, json);
   }
 
   @Override
@@ -116,19 +114,15 @@ class SnowflakeTableOperations extends BaseMetastoreTableOperations {
 
   private String getTableMetadataLocation()
       throws UncheckedSQLException, SQLException, InterruptedException {
-    List<String> metadataLocations = Lists.newArrayList();
-    metadataLocations.addAll(
-        SnowflakeUtils.fetch(
-            connections,
-            row -> row.getString(1),
-            String.format(SnowflakeUtils.METADATA_LOCATION_QUERY, tableName())));
+    SnowflakeTableMetadata metadata = queryFactory.getTableMetadata(tableIdentifier);
 
+    if (metadata == null) {
+      throw new NoSuchTableException("Cannot find table %s", tableIdentifier);
+    }
     Preconditions.checkState(
-        metadataLocations.size() == 1,
-        "Expected a single metadata location for table : %s, actual location count %d ",
-        tableIdentifier,
-        metadataLocations.size());
-
-    return getMetadataLocationFromJson(metadataLocations.get(0));
+        metadata.getStatus().equals("success"),
+        "Could not retrieve metadata location for table : %s",
+        tableIdentifier);
+    return metadata.getMetadataLocation();
   }
 }
