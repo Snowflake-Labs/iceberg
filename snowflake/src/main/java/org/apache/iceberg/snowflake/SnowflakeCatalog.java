@@ -19,7 +19,6 @@
 package org.apache.iceberg.snowflake;
 
 import java.io.Closeable;
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -32,7 +31,6 @@ import org.apache.iceberg.TableOperations;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.SupportsNamespaces;
 import org.apache.iceberg.catalog.TableIdentifier;
-import org.apache.iceberg.exceptions.NamespaceNotEmptyException;
 import org.apache.iceberg.exceptions.NoSuchNamespaceException;
 import org.apache.iceberg.hadoop.Configurable;
 import org.apache.iceberg.io.FileIO;
@@ -57,8 +55,6 @@ public class SnowflakeCatalog extends BaseMetastoreCatalog
   private FileIO fileIO;
   private QueryFactory queryFactory;
 
-  private JdbcClientPool connectionPool;
-
   public SnowflakeCatalog() {}
 
   public void setQueryFactory(QueryFactory factory) {
@@ -67,6 +63,9 @@ public class SnowflakeCatalog extends BaseMetastoreCatalog
 
   @Override
   public List<TableIdentifier> listTables(Namespace namespace) {
+    Preconditions.checkArgument(
+        namespace.length() <= SnowflakeResources.MAX_NAMESPACE_DEPTH,
+        "Snowflake doesn't supports more than 2 levels of namespace");
 
     List<SnowflakeTable> sfTables = queryFactory.listIcebergTables(namespace);
 
@@ -98,13 +97,13 @@ public class SnowflakeCatalog extends BaseMetastoreCatalog
 
     LOG.debug("Connecting to JDBC database {}", properties.get(CatalogProperties.URI));
 
-    connectionPool = new JdbcClientPool(uri, properties);
+    JdbcClientPool connectionPool = new JdbcClientPool(uri, properties);
 
     if (queryFactory == null) {
       queryFactory = new SnowflakeQueryFactory(connectionPool);
     }
 
-    String fileIOImpl = SnowflakeResources.getDefaultFileIoImpl();
+    String fileIOImpl = SnowflakeResources.DEFAULT_FILE_IO_IMPL;
 
     if (null != catalogProperties.get(CatalogProperties.FILE_IO_IMPL)) {
       fileIOImpl = catalogProperties.get(CatalogProperties.FILE_IO_IMPL);
@@ -114,7 +113,7 @@ public class SnowflakeCatalog extends BaseMetastoreCatalog
   }
 
   @Override
-  public void close() throws IOException {
+  public void close() {
     queryFactory.close();
   }
 
@@ -122,7 +121,7 @@ public class SnowflakeCatalog extends BaseMetastoreCatalog
   public void createNamespace(Namespace namespace, Map<String, String> metadata) {}
 
   @Override
-  public List<Namespace> listNamespaces(Namespace namespace) throws NoSuchNamespaceException {
+  public List<Namespace> listNamespaces(Namespace namespace) {
     Preconditions.checkArgument(
         namespace.length() <= SnowflakeResources.MAX_NAMESPACE_DEPTH,
         "Snowflake doesn't supports more than 2 levels of namespace");
@@ -134,7 +133,7 @@ public class SnowflakeCatalog extends BaseMetastoreCatalog
               .map(schema -> Namespace.of(schema.getDatabase(), schema.getName()))
               .collect(Collectors.toList());
     } catch (UncheckedSQLException | UncheckedInterruptedException ex) {
-      LOG.error("{}", ex.toString(), ex);
+      LOG.error("{}", ex.getMessage(), ex);
     }
 
     if (namespace.length() == SnowflakeResources.MAX_NAMESPACE_DEPTH) {
@@ -163,24 +162,26 @@ public class SnowflakeCatalog extends BaseMetastoreCatalog
   }
 
   @Override
-  public boolean dropNamespace(Namespace namespace) throws NamespaceNotEmptyException {
+  public boolean dropNamespace(Namespace namespace) {
     return false;
   }
 
   @Override
-  public boolean setProperties(Namespace namespace, Map<String, String> properties)
-      throws NoSuchNamespaceException {
+  public boolean setProperties(Namespace namespace, Map<String, String> properties) {
     return false;
   }
 
   @Override
-  public boolean removeProperties(Namespace namespace, Set<String> properties)
-      throws NoSuchNamespaceException {
+  public boolean removeProperties(Namespace namespace, Set<String> properties) {
     return false;
   }
 
   @Override
   protected TableOperations newTableOps(TableIdentifier tableIdentifier) {
+    Preconditions.checkArgument(
+        tableIdentifier.namespace().length() <= SnowflakeResources.MAX_NAMESPACE_DEPTH,
+        "Snowflake doesn't supports more than 2 levels of namespace");
+
     return new SnowflakeTableOperations(
         queryFactory, fileIO, catalogProperties, catalogName, tableIdentifier);
   }

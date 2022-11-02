@@ -18,6 +18,7 @@
  */
 package org.apache.iceberg.snowflake;
 
+import java.io.Closeable;
 import java.util.List;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -25,7 +26,7 @@ import org.apache.iceberg.snowflake.entities.SnowflakeSchema;
 import org.apache.iceberg.snowflake.entities.SnowflakeTable;
 import org.apache.iceberg.snowflake.entities.SnowflakeTableMetadata;
 
-public interface QueryFactory {
+public interface QueryFactory extends Closeable {
   List<SnowflakeSchema> listSchemas(Namespace namespace);
 
   List<SnowflakeTable> listIcebergTables(Namespace namespace);

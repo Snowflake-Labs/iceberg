@@ -20,15 +20,10 @@ package org.apache.iceberg.snowflake;
 
 final class SnowflakeResources {
   static final String DEFAULT_CATALOG_NAME = "snowlog";
-  private static final String DEFAULT_FILE_IO_IMPL = "org.apache.iceberg.hadoop.HadoopFileIO";
-  static final String METADATA_LOCATION = "metadataLocation";
+  static final String DEFAULT_FILE_IO_IMPL = "org.apache.iceberg.hadoop.HadoopFileIO";
   static final int MAX_NAMESPACE_DEPTH = 2;
   static final int NAMESPACE_DB_LEVEL = 1;
   static final int NAMESPACE_SCHEMA_LEVEL = 2;
 
   private SnowflakeResources() {}
-
-  public static String getDefaultFileIoImpl() {
-    return DEFAULT_FILE_IO_IMPL;
-  }
 }

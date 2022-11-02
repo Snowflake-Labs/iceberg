@@ -34,8 +34,7 @@ public class TestFileIO implements FileIO {
     try {
       Path filePath = Paths.get(getClass().getClassLoader().getResource(path).toURI());
       byte[] data = Files.readAllBytes(filePath);
-      InputFile file = new InMemoryInputFile(filePath.toString(), data);
-      return file;
+      return (InputFile) new InMemoryInputFile(filePath.toString(), data);
     } catch (URISyntaxException | IOException e) {
       throw new RuntimeException(e);
     }

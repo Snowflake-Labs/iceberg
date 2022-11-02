@@ -18,8 +18,6 @@
  */
 package org.apache.iceberg.snowflake.entities;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.List;
 import org.apache.commons.dbutils.ResultSetHandler;
 import org.apache.iceberg.relocated.com.google.common.collect.Lists;
@@ -33,41 +31,25 @@ public class SnowflakeTable {
     return name;
   }
 
-  public void setName(String name) {
-    this.name = name;
-  }
-
   public String getDatabase() {
     return databaseName;
-  }
-
-  public void setDatabaseName(String dbName) {
-    databaseName = dbName;
   }
 
   public String getSchemaName() {
     return schemaName;
   }
 
-  public void setSchemaName(String schemaName) {
-    this.schemaName = schemaName;
-  }
-
   public static ResultSetHandler<List<SnowflakeTable>> createHandler() {
-    return new ResultSetHandler<List<SnowflakeTable>>() {
-      @Override
-      public List<SnowflakeTable> handle(ResultSet rs) throws SQLException {
-
-        List<SnowflakeTable> schemas = Lists.newArrayList();
-        while (rs.next()) {
-          SnowflakeTable schema = new SnowflakeTable();
-          schema.name = rs.getString("name");
-          schema.databaseName = rs.getString("database_name");
-          schema.schemaName = rs.getString("schema_name");
-          schemas.add(schema);
-        }
-        return schemas;
+    return rs -> {
+      List<SnowflakeTable> schemas = Lists.newArrayList();
+      while (rs.next()) {
+        SnowflakeTable schema = new SnowflakeTable();
+        schema.name = rs.getString("name");
+        schema.databaseName = rs.getString("database_name");
+        schema.schemaName = rs.getString("schema_name");
+        schemas.add(schema);
       }
+      return schemas;
     };
   }
 }

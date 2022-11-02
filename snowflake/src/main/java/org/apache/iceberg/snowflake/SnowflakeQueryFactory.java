@@ -30,9 +30,13 @@ import org.apache.iceberg.relocated.com.google.common.collect.Lists;
 import org.apache.iceberg.snowflake.entities.SnowflakeSchema;
 import org.apache.iceberg.snowflake.entities.SnowflakeTable;
 import org.apache.iceberg.snowflake.entities.SnowflakeTableMetadata;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class SnowflakeQueryFactory implements QueryFactory {
-  private JdbcClientPool connectionPool;
+
+  private static final Logger LOG = LoggerFactory.getLogger(SnowflakeQueryFactory.class);
+  private final JdbcClientPool connectionPool;
 
   SnowflakeQueryFactory(JdbcClientPool conn) {
     connectionPool = conn;
@@ -40,37 +44,48 @@ public class SnowflakeQueryFactory implements QueryFactory {
 
   @Override
   public List<SnowflakeSchema> listSchemas(Namespace namespace) {
-    String query = "show schemas";
+    String baseQuery = "show schemas";
 
     QueryRunner run = new QueryRunner(true);
-    List<SnowflakeSchema> schemas = null;
+    List<SnowflakeSchema> schemas;
     try {
+      // for empty or null namespace search for all schemas at account level where the user
+      // has access to list.
       if (namespace == null || namespace.isEmpty()) {
-        query += " in account";
-        final String finalQuery = query;
+        baseQuery += " in account";
+        final String finalQuery = baseQuery;
         schemas =
             connectionPool.run(
-                conn -> {
-                  return run.query(conn, finalQuery, SnowflakeSchema.createHandler());
-                });
-      } else {
-        query += " in identifier(?)";
-        final String finalQuery = query;
+                conn -> run.query(conn, finalQuery, SnowflakeSchema.createHandler()));
+      }
+      // otherwise restrict listing of schema within the database.
+      else {
+        baseQuery += " in identifier(?)";
+        final String finalQuery = baseQuery;
         schemas =
             connectionPool.run(
-                conn -> {
-                  return run.query(
-                      conn,
-                      finalQuery,
-                      SnowflakeSchema.createHandler(),
-                      namespace.level(SnowflakeResources.NAMESPACE_DB_LEVEL - 1));
-                });
+                conn ->
+                    run.query(
+                        conn,
+                        finalQuery,
+                        SnowflakeSchema.createHandler(),
+                        namespace.level(SnowflakeResources.NAMESPACE_DB_LEVEL - 1)));
       }
 
     } catch (SQLException e) {
+      LOG.error(
+          "Failed to list schemas for namespace {}",
+          namespace != null ? namespace.toString() : "",
+          e);
       throw new UncheckedSQLException(
-          e, "Failed to list schemas for namespace %s", namespace.toString());
+          e,
+          "Failed to list schemas for namespace %s",
+          namespace != null ? namespace.toString() : "");
     } catch (InterruptedException e) {
+      LOG.error(
+          "Failed to list schemas for namespace {}",
+          namespace != null ? namespace.toString() : "",
+          e);
       throw new UncheckedInterruptedException(e, "Connection error while listing schemas");
     }
     return schemas;
@@ -79,54 +94,53 @@ public class SnowflakeQueryFactory implements QueryFactory {
   @Override
   public List<SnowflakeTable> listIcebergTables(Namespace namespace) {
 
-    String query = "show iceberg tables";
+    String baseQuery = "show iceberg tables";
 
     QueryRunner run = new QueryRunner(true);
 
     List<SnowflakeTable> tables = Lists.newArrayList();
     try {
+      // For two level namespace, search for iceberg tables within the given schema.
       if (namespace.length() == SnowflakeResources.MAX_NAMESPACE_DEPTH) {
-        query += " in identifier(?)";
-        final String finalQuery = query;
+        baseQuery += " in identifier(?)";
+        final String finalQuery = baseQuery;
         tables.addAll(
             connectionPool.run(
-                conn -> {
-                  return run.query(
-                      conn,
-                      finalQuery,
-                      SnowflakeTable.createHandler(),
-                      String.format(
-                          "%s.%s",
-                          namespace.level(SnowflakeResources.NAMESPACE_DB_LEVEL - 1),
-                          namespace.level(SnowflakeResources.NAMESPACE_SCHEMA_LEVEL - 1)));
-                }));
-      } else if (namespace.length() == SnowflakeResources.NAMESPACE_DB_LEVEL) {
-        query += " in account";
-        final String finalQuery = query;
+                conn ->
+                    run.query(
+                        conn,
+                        finalQuery,
+                        SnowflakeTable.createHandler(),
+                        String.format(
+                            "%s.%s",
+                            namespace.level(SnowflakeResources.NAMESPACE_DB_LEVEL - 1),
+                            namespace.level(SnowflakeResources.NAMESPACE_SCHEMA_LEVEL - 1)))));
+      }
+      // For empty or db level namespace, search at account level. For Db level namespace results
+      // would be filtered to exclude tables from other databases.
+      else {
+        baseQuery += " in account";
+        final String finalQuery = baseQuery;
         tables.addAll(
             connectionPool.run(
-                conn -> {
-                  return run.query(conn, finalQuery, SnowflakeTable.createHandler());
-                }));
+                conn -> run.query(conn, finalQuery, SnowflakeTable.createHandler())));
+      }
+
+      // In case of DB level namespace, filter the results to given namespace
+      if (namespace.length() == SnowflakeResources.NAMESPACE_DB_LEVEL) {
         tables.removeIf(
             table ->
                 !table
                     .getDatabase()
                     .equals(namespace.level(SnowflakeResources.NAMESPACE_DB_LEVEL - 1)));
-      } else {
-        query += " in account";
-        final String finalQuery = query;
-        tables.addAll(
-            connectionPool.run(
-                conn -> {
-                  return run.query(conn, finalQuery, SnowflakeTable.createHandler());
-                }));
       }
 
     } catch (SQLException e) {
+      LOG.error("Failed to list tables for namespace {}", namespace, e);
       throw new UncheckedSQLException(
           e, "Failed to list tables for namespace %s", namespace.toString());
     } catch (InterruptedException e) {
+      LOG.error("Failed to list tables for namespace {}", namespace, e);
       throw new UncheckedInterruptedException(e, "Connection error while listing tables");
     }
     return tables;
@@ -136,22 +150,23 @@ public class SnowflakeQueryFactory implements QueryFactory {
   public SnowflakeTableMetadata getTableMetadata(TableIdentifier tableIdentifier) {
     QueryRunner run = new QueryRunner(true);
 
-    SnowflakeTableMetadata tableMeta = null;
+    SnowflakeTableMetadata tableMeta;
     try {
       final String finalQuery = "select SYSTEM$GET_ICEBERG_TABLE_INFORMATION(?) as location";
       tableMeta =
           connectionPool.run(
-              conn -> {
-                return run.query(
-                    conn,
-                    finalQuery,
-                    SnowflakeTableMetadata.createHandler(),
-                    tableIdentifier.toString());
-              });
+              conn ->
+                  run.query(
+                      conn,
+                      finalQuery,
+                      SnowflakeTableMetadata.createHandler(),
+                      tableIdentifier.toString()));
     } catch (SQLException e) {
+      LOG.error("Failed to get metadata for table {}", tableIdentifier.toString(), e);
       throw new UncheckedSQLException(
           e, "Failed to get table metadata for %s", tableIdentifier.toString());
     } catch (InterruptedException e) {
+      LOG.error("Failed to get metadata for table {}", tableIdentifier.toString(), e);
       throw new UncheckedInterruptedException(e, "Connection error while getting table metadata");
     }
     return tableMeta;

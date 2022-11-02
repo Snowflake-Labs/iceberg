@@ -32,12 +32,14 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Scanner;
 import java.util.UUID;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.jdbc.JdbcClientPool;
 import org.apache.iceberg.relocated.com.google.common.collect.Lists;
 import org.apache.iceberg.relocated.com.google.common.collect.Maps;
 import org.junit.Assert;
@@ -45,8 +47,6 @@ import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
-import org.mockito.MockedStatic;
-import org.mockito.Mockito;
 
 public class SnowflakeCatalogTest {
 
@@ -58,7 +58,6 @@ public class SnowflakeCatalogTest {
   static final String TEST_CUSTOM_FILE_IO = "org.apache.iceberg.snowflake.TestFileIO";
   static String uri;
   static SnowflakeCatalog catalog;
-  static MockedStatic<SnowflakeResources> mockedResources;
 
   @ClassRule public static TemporaryFolder folder = new TemporaryFolder();
 
@@ -78,53 +77,42 @@ public class SnowflakeCatalogTest {
 
     properties.put(CatalogProperties.URI, uri);
 
-    mockedResources = Mockito.mockStatic(SnowflakeResources.class);
-    mockedResources
-        .when(() -> SnowflakeResources.getDefaultFileIoImpl())
-        .thenReturn((TEST_CUSTOM_FILE_IO));
+    properties.put(CatalogProperties.FILE_IO_IMPL, TEST_CUSTOM_FILE_IO);
 
     try {
       Connection con = DriverManager.getConnection(uri);
       Path path =
           Paths.get(
-              SnowflakeCatalogTest.class.getClassLoader().getResource(TEST_SETUP_SCRIPT).toURI());
+              Objects.requireNonNull(
+                      SnowflakeCatalogTest.class.getClassLoader().getResource(TEST_SETUP_SCRIPT))
+                  .toURI());
       importSQLScript(con, new FileInputStream(path.toFile()));
 
       catalog = new SnowflakeCatalog();
-      catalog.setQueryFactory(new TestQueryFactory(DriverManager.getConnection(uri)));
+      JdbcClientPool connectionPool = new JdbcClientPool(uri, properties);
+      catalog.setQueryFactory(new TestQueryFactory(connectionPool));
       catalog.initialize(TEST_CATALOG_NAME, properties);
       con.close();
-    } catch (SQLException e) {
-      throw new RuntimeException(e);
-    } catch (URISyntaxException e) {
-      throw new RuntimeException(e);
-    } catch (FileNotFoundException e) {
+    } catch (SQLException | URISyntaxException | FileNotFoundException e) {
       throw new RuntimeException(e);
     }
   }
 
   static void importSQLScript(Connection conn, InputStream in) throws SQLException {
     Scanner scan = new Scanner(in);
-    scan.useDelimiter("(;(\r)?\n)|(--\n)");
-    Statement st = null;
-    try {
-      st = conn.createStatement();
+    String delimiterPattern = "(;(\r)?\n)|(--\n)";
+    scan.useDelimiter(delimiterPattern);
+    try (Statement st = conn.createStatement()) {
       while (scan.hasNext()) {
         String line = scan.next();
         if (line.startsWith("/*!") && line.endsWith("*/")) {
-          int indx = line.indexOf(' ');
-          line = line.substring(indx + 1, line.length() - " */".length());
+          int index = line.indexOf(' ');
+          line = line.substring(index + 1, line.length() - " */".length());
         }
 
         if (line.trim().length() > 0) {
           st.execute(line);
         }
-      }
-    } catch (Exception ex) {
-      throw ex;
-    } finally {
-      if (st != null) {
-        st.close();
       }
     }
   }

@@ -18,8 +18,6 @@
  */
 package org.apache.iceberg.snowflake.entities;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.List;
 import org.apache.commons.dbutils.ResultSetHandler;
 import org.apache.iceberg.relocated.com.google.common.collect.Lists;
@@ -32,32 +30,20 @@ public class SnowflakeSchema {
     return name;
   }
 
-  public void setName(String name) {
-    this.name = name;
-  }
-
   public String getDatabase() {
     return databaseName;
   }
 
-  public void setDatabase(String dbname) {
-    this.databaseName = dbname;
-  }
-
   public static ResultSetHandler<List<SnowflakeSchema>> createHandler() {
-    return new ResultSetHandler<List<SnowflakeSchema>>() {
-      @Override
-      public List<SnowflakeSchema> handle(ResultSet rs) throws SQLException {
-
-        List<SnowflakeSchema> schemas = Lists.newArrayList();
-        while (rs.next()) {
-          SnowflakeSchema schema = new SnowflakeSchema();
-          schema.name = rs.getString("name");
-          schema.databaseName = rs.getString("database_name");
-          schemas.add(schema);
-        }
-        return schemas;
+    return rs -> {
+      List<SnowflakeSchema> schemas = Lists.newArrayList();
+      while (rs.next()) {
+        SnowflakeSchema schema = new SnowflakeSchema();
+        schema.name = rs.getString("name");
+        schema.databaseName = rs.getString("database_name");
+        schemas.add(schema);
       }
+      return schemas;
     };
   }
 }

@@ -19,8 +19,6 @@
 package org.apache.iceberg.snowflake.entities;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import org.apache.commons.dbutils.ResultSetHandler;
 import org.apache.iceberg.util.JsonUtil;
 
@@ -34,32 +32,21 @@ public class SnowflakeTableMetadata {
     return metadataLocation;
   }
 
-  public void setMetadataLocation(String location) {
-    metadataLocation = location;
-  }
-
   public String getStatus() {
     return status;
   }
 
-  public void setStatus(String status) {
-    this.status = status;
-  }
-
   public static ResultSetHandler<SnowflakeTableMetadata> createHandler() {
-    return new ResultSetHandler<SnowflakeTableMetadata>() {
-      @Override
-      public SnowflakeTableMetadata handle(ResultSet rs) throws SQLException {
-        if (!rs.next()) {
-          return null;
-        }
-
-        SnowflakeTableMetadata schema = new SnowflakeTableMetadata();
-        schema.jsonVal = rs.getString("LOCATION");
-        schema.metadataLocation = getMetadataLocationFromJson(schema.jsonVal);
-        schema.status = getStatusFromJson(schema.jsonVal);
-        return schema;
+    return rs -> {
+      if (!rs.next()) {
+        return null;
       }
+
+      SnowflakeTableMetadata schema = new SnowflakeTableMetadata();
+      schema.jsonVal = rs.getString("LOCATION");
+      schema.metadataLocation = getMetadataLocationFromJson(schema.jsonVal);
+      schema.status = getStatusFromJson(schema.jsonVal);
+      return schema;
     };
   }
 

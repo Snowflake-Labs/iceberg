@@ -18,7 +18,6 @@
  */
 package org.apache.iceberg.snowflake;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import java.sql.SQLException;
 import java.util.Map;
 import org.apache.iceberg.BaseMetastoreTableOperations;
@@ -29,7 +28,6 @@ import org.apache.iceberg.jdbc.UncheckedInterruptedException;
 import org.apache.iceberg.jdbc.UncheckedSQLException;
 import org.apache.iceberg.relocated.com.google.common.base.Preconditions;
 import org.apache.iceberg.snowflake.entities.SnowflakeTableMetadata;
-import org.apache.iceberg.util.JsonUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,10 +36,10 @@ class SnowflakeTableOperations extends BaseMetastoreTableOperations {
   private static final Logger LOG = LoggerFactory.getLogger(SnowflakeTableOperations.class);
   private final String catalogName;
 
-  private FileIO fileIO;
+  private final FileIO fileIO;
   private final TableIdentifier tableIdentifier;
 
-  private QueryFactory queryFactory;
+  private final QueryFactory queryFactory;
 
   private final Map<String, String> catalogProperties;
 
@@ -60,8 +58,6 @@ class SnowflakeTableOperations extends BaseMetastoreTableOperations {
 
   @Override
   public void doRefresh() {
-    Map<String, String> table;
-
     String location = null;
     try {
       LOG.debug("Getting metadata location for table {}", tableName());
@@ -75,7 +71,7 @@ class SnowflakeTableOperations extends BaseMetastoreTableOperations {
           e, "Failed to get table %s from catalog %s", tableIdentifier, catalogName);
     }
 
-    if (location.isEmpty()) {
+    if (location == null || location.isEmpty()) {
       if (currentMetadataLocation() != null) {
         throw new NoSuchTableException(
             "Failed to load table %s from catalog %s: dropped by another process",
@@ -88,18 +84,8 @@ class SnowflakeTableOperations extends BaseMetastoreTableOperations {
 
     String newMetadataLocation = location;
     Preconditions.checkState(
-        newMetadataLocation != null,
-        "Invalid table %s: metadata location is null",
-        tableIdentifier);
+        location != null, "Invalid table %s: metadata location is null", tableIdentifier);
     refreshFromMetadataLocation(newMetadataLocation);
-  }
-
-  static String getMetadataLocationFromJson(String json) {
-    return JsonUtil.parse(json, SnowflakeTableOperations::getMetadataLocationFromJson);
-  }
-
-  static String getMetadataLocationFromJson(JsonNode json) {
-    return JsonUtil.getString(SnowflakeResources.METADATA_LOCATION, json);
   }
 
   @Override
