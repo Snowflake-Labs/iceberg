@@ -49,6 +49,20 @@ public class SnowflakeCatalog extends BaseMetastoreCatalog
     implements Closeable, SupportsNamespaces, Configurable<Object> {
 
   private static final Logger LOG = LoggerFactory.getLogger(SnowflakeCatalog.class);
+
+  static {
+    try {
+      Class.forName("net.snowflake.client.jdbc.SnowflakeDriver");
+    } catch (ClassNotFoundException e) {
+      throw new IllegalStateException(
+          "Unable to load "
+              + "net.snowflake.client.jdbc.SnowflakeDriver. "
+              + "Please check if you have proper Snowflake JDBC "
+              + "Driver jar on the classpath",
+          e);
+    }
+  }
+
   private Object conf;
   private String catalogName = SnowflakeResources.DEFAULT_CATALOG_NAME;
   private Map<String, String> catalogProperties = null;
@@ -137,7 +151,8 @@ public class SnowflakeCatalog extends BaseMetastoreCatalog
     }
 
     if (namespace.length() == SnowflakeResources.MAX_NAMESPACE_DEPTH) {
-      if (namespaceList.contains(namespace)) {
+      if (namespaceList.stream()
+          .anyMatch(n -> n.toString().equalsIgnoreCase(namespace.toString()))) {
         return Arrays.asList(namespace);
       } else {
         return Lists.newArrayList();

@@ -115,6 +115,16 @@ public class SnowflakeQueryFactory implements QueryFactory {
                             "%s.%s",
                             namespace.level(SnowflakeResources.NAMESPACE_DB_LEVEL - 1),
                             namespace.level(SnowflakeResources.NAMESPACE_SCHEMA_LEVEL - 1)))));
+      } else if (namespace.length() == SnowflakeResources.NAMESPACE_DB_LEVEL) {
+        final String finalQuery = baseQuery + " in database identifier(?)";
+        tables.addAll(
+            connectionPool.run(
+                conn ->
+                    run.query(
+                        conn,
+                        finalQuery,
+                        SnowflakeTable.createHandler(),
+                        namespace.level(SnowflakeResources.NAMESPACE_DB_LEVEL - 1))));
       }
       // For empty or db level namespace, search at account level. For Db level namespace results
       // would be filtered to exclude tables from other databases.
@@ -132,7 +142,7 @@ public class SnowflakeQueryFactory implements QueryFactory {
             table ->
                 !table
                     .getDatabase()
-                    .equals(namespace.level(SnowflakeResources.NAMESPACE_DB_LEVEL - 1)));
+                    .equalsIgnoreCase(namespace.level(SnowflakeResources.NAMESPACE_DB_LEVEL - 1)));
       }
 
     } catch (SQLException e) {
