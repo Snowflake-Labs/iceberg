@@ -50,19 +50,6 @@ public class SnowflakeCatalog extends BaseMetastoreCatalog
 
   private static final Logger LOG = LoggerFactory.getLogger(SnowflakeCatalog.class);
 
-  static {
-    try {
-      Class.forName("net.snowflake.client.jdbc.SnowflakeDriver");
-    } catch (ClassNotFoundException e) {
-      throw new IllegalStateException(
-          "Unable to load "
-              + "net.snowflake.client.jdbc.SnowflakeDriver. "
-              + "Please check if you have proper Snowflake JDBC "
-              + "Driver jar on the classpath",
-          e);
-    }
-  }
-
   private Object conf;
   private String catalogName = SnowflakeResources.DEFAULT_CATALOG_NAME;
   private Map<String, String> catalogProperties = null;
