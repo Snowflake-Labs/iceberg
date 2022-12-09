@@ -153,12 +153,6 @@ public class SnowflakeCatalog extends BaseMetastoreCatalog
   public Map<String, String> loadNamespaceMetadata(Namespace namespace)
       throws NoSuchNamespaceException {
     LOG.debug("loadNamespaceMetadata with namespace: {}", namespace);
-    List<Namespace> allNamespaces = listNamespaces(namespace);
-
-    if (allNamespaces.size() == 0) {
-      throw new NoSuchNamespaceException("Could not find namespace %s", namespace);
-    }
-
     Map<String, String> nameSpaceMetadata = Maps.newHashMap();
     nameSpaceMetadata.put("name", namespace.toString());
     return nameSpaceMetadata;
