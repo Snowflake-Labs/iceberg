@@ -33,6 +33,16 @@ import org.apache.iceberg.snowflake.entities.SnowflakeTableMetadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * This implementation of SnowflakeClient builds on top of Snowflake's JDBC driver to interact with
+ * Snowflake's Iceberg-aware resource model. Despite using JDBC libraries, the resource model is
+ * derived from Snowflake's own first-class support for Iceberg tables as opposed to using an opaque
+ * JDBC layer to store Iceberg metadata itself in an Iceberg-agnostic database.
+ *
+ * <p>This thus differs from the JdbcCatalog in that Snowflake's service provides the source of
+ * truth of Iceberg metadata, rather than serving as a storage layer for a client-defined Iceberg
+ * resource model.
+ */
 public class JdbcSnowflakeClient implements SnowflakeClient {
 
   private static final Logger LOG = LoggerFactory.getLogger(JdbcSnowflakeClient.class);
@@ -57,9 +67,8 @@ public class JdbcSnowflakeClient implements SnowflakeClient {
         schemas =
             connectionPool.run(
                 conn -> run.query(conn, finalQuery, SnowflakeSchema.createHandler()));
-      }
-      // otherwise restrict listing of schema within the database.
-      else {
+      } else {
+        // otherwise restrict listing of schema within the database.
         baseQuery += " in identifier(?)";
         final String finalQuery = baseQuery;
         schemas =
@@ -125,26 +134,15 @@ public class JdbcSnowflakeClient implements SnowflakeClient {
                         finalQuery,
                         SnowflakeTable.createHandler(),
                         namespace.level(SnowflakeResources.NAMESPACE_DB_LEVEL - 1))));
-      }
-      // For empty or db level namespace, search at account level. For Db level namespace results
-      // would be filtered to exclude tables from other databases.
-      else {
+      } else {
+        // For empty or db level namespace, search at account level. For Db level namespace results
+        // would be filtered to exclude tables from other databases.
         baseQuery += " in account";
         final String finalQuery = baseQuery;
         tables.addAll(
             connectionPool.run(
                 conn -> run.query(conn, finalQuery, SnowflakeTable.createHandler())));
       }
-
-      // In case of DB level namespace, filter the results to given namespace
-      if (namespace.length() == SnowflakeResources.NAMESPACE_DB_LEVEL) {
-        tables.removeIf(
-            table ->
-                !table
-                    .getDatabase()
-                    .equalsIgnoreCase(namespace.level(SnowflakeResources.NAMESPACE_DB_LEVEL - 1)));
-      }
-
     } catch (SQLException e) {
       LOG.error("Failed to list tables for namespace {}", namespace, e);
       throw new UncheckedSQLException(

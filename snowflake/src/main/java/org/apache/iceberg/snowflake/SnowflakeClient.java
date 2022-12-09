@@ -26,6 +26,12 @@ import org.apache.iceberg.snowflake.entities.SnowflakeSchema;
 import org.apache.iceberg.snowflake.entities.SnowflakeTable;
 import org.apache.iceberg.snowflake.entities.SnowflakeTableMetadata;
 
+/**
+ * This interface abstracts out the underlying communication protocols for contacting Snowflake to
+ * obtain the various resource representations defined under "entities". Classes using this
+ * interface should minimize assumptions about whether an underlying client uses e.g. REST, JDBC or
+ * other underlying libraries/protocols.
+ */
 public interface SnowflakeClient extends Closeable {
   List<SnowflakeSchema> listSchemas(Namespace namespace);
 

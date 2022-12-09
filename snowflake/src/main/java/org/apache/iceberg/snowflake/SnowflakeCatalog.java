@@ -19,7 +19,6 @@
 package org.apache.iceberg.snowflake;
 
 import java.io.Closeable;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -35,8 +34,6 @@ import org.apache.iceberg.exceptions.NoSuchNamespaceException;
 import org.apache.iceberg.hadoop.Configurable;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.jdbc.JdbcClientPool;
-import org.apache.iceberg.jdbc.UncheckedInterruptedException;
-import org.apache.iceberg.jdbc.UncheckedSQLException;
 import org.apache.iceberg.relocated.com.google.common.annotations.VisibleForTesting;
 import org.apache.iceberg.relocated.com.google.common.base.Preconditions;
 import org.apache.iceberg.relocated.com.google.common.collect.Lists;
@@ -74,7 +71,9 @@ public class SnowflakeCatalog extends BaseMetastoreCatalog
     LOG.debug("listTables with namespace: {}", namespace);
     Preconditions.checkArgument(
         namespace.length() <= SnowflakeResources.MAX_NAMESPACE_DEPTH,
-        "Snowflake doesn't supports more than 2 levels of namespace");
+        "Snowflake doesn't support more than %s levels of namespace, got %s",
+        SnowflakeResources.MAX_NAMESPACE_DEPTH,
+        namespace);
 
     List<SnowflakeTable> sfTables = snowflakeClient.listIcebergTables(namespace);
 
@@ -87,11 +86,15 @@ public class SnowflakeCatalog extends BaseMetastoreCatalog
 
   @Override
   public boolean dropTable(TableIdentifier identifier, boolean purge) {
-    return false;
+    throw new UnsupportedOperationException(
+        String.format("dropTable not supported; attempted for table '%s'", identifier));
   }
 
   @Override
-  public void renameTable(TableIdentifier from, TableIdentifier to) {}
+  public void renameTable(TableIdentifier from, TableIdentifier to) {
+    throw new UnsupportedOperationException(
+        String.format("renameTable not supported; attempted from '%s' to '%s'", from, to));
+  }
 
   @Override
   public void initialize(String name, Map<String, String> properties) {
@@ -125,33 +128,25 @@ public class SnowflakeCatalog extends BaseMetastoreCatalog
   }
 
   @Override
-  public void createNamespace(Namespace namespace, Map<String, String> metadata) {}
+  public void createNamespace(Namespace namespace, Map<String, String> metadata) {
+    throw new UnsupportedOperationException(
+        String.format("createNamespace not supported; attempted for namespace '%s'", namespace));
+  }
 
   @Override
   public List<Namespace> listNamespaces(Namespace namespace) {
     LOG.debug("listNamespaces with namespace: {}", namespace);
     Preconditions.checkArgument(
-        namespace.length() <= SnowflakeResources.MAX_NAMESPACE_DEPTH,
-        "Snowflake doesn't supports more than 2 levels of namespace");
+        namespace.length() <= SnowflakeResources.MAX_NAMESPACE_DEPTH - 1,
+        "Snowflake doesn't support more than %s levels of namespace, tried to list under %s",
+        SnowflakeResources.MAX_NAMESPACE_DEPTH,
+        namespace);
     List<Namespace> namespaceList = Lists.newArrayList();
-    try {
-      List<SnowflakeSchema> sfSchemas = snowflakeClient.listSchemas(namespace);
-      namespaceList =
-          sfSchemas.stream()
-              .map(schema -> Namespace.of(schema.getDatabase(), schema.getName()))
-              .collect(Collectors.toList());
-    } catch (UncheckedSQLException | UncheckedInterruptedException ex) {
-      LOG.error("{}", ex.getMessage(), ex);
-    }
-
-    if (namespace.length() == SnowflakeResources.MAX_NAMESPACE_DEPTH) {
-      if (namespaceList.stream()
-          .anyMatch(n -> n.toString().equalsIgnoreCase(namespace.toString()))) {
-        return Arrays.asList(namespace);
-      } else {
-        return Lists.newArrayList();
-      }
-    }
+    List<SnowflakeSchema> sfSchemas = snowflakeClient.listSchemas(namespace);
+    namespaceList =
+        sfSchemas.stream()
+            .map(schema -> Namespace.of(schema.getDatabase(), schema.getName()))
+            .collect(Collectors.toList());
 
     return namespaceList;
   }
@@ -173,24 +168,29 @@ public class SnowflakeCatalog extends BaseMetastoreCatalog
 
   @Override
   public boolean dropNamespace(Namespace namespace) {
-    return false;
+    throw new UnsupportedOperationException(
+        String.format("dropNamespace not supported; attempted for namespace '%s'", namespace));
   }
 
   @Override
   public boolean setProperties(Namespace namespace, Map<String, String> properties) {
-    return false;
+    throw new UnsupportedOperationException(
+        String.format("setProperties not supported; attempted for namespace '%s'", namespace));
   }
 
   @Override
   public boolean removeProperties(Namespace namespace, Set<String> properties) {
-    return false;
+    throw new UnsupportedOperationException(
+        String.format("removeProperties not supported; attempted for namespace '%s'", namespace));
   }
 
   @Override
   protected TableOperations newTableOps(TableIdentifier tableIdentifier) {
     Preconditions.checkArgument(
         tableIdentifier.namespace().length() <= SnowflakeResources.MAX_NAMESPACE_DEPTH,
-        "Snowflake doesn't supports more than 2 levels of namespace");
+        "Snowflake doesn't support more than %s levels of namespace, got %s",
+        SnowflakeResources.MAX_NAMESPACE_DEPTH,
+        tableIdentifier);
 
     return new SnowflakeTableOperations(
         snowflakeClient, fileIO, catalogProperties, catalogName, tableIdentifier);

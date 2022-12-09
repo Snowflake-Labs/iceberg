@@ -18,14 +18,11 @@
  */
 package org.apache.iceberg.snowflake;
 
-import java.sql.SQLException;
 import java.util.Map;
 import org.apache.iceberg.BaseMetastoreTableOperations;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.io.FileIO;
-import org.apache.iceberg.jdbc.UncheckedInterruptedException;
-import org.apache.iceberg.jdbc.UncheckedSQLException;
 import org.apache.iceberg.relocated.com.google.common.base.Preconditions;
 import org.apache.iceberg.snowflake.entities.SnowflakeTableMetadata;
 import org.slf4j.Logger;
@@ -58,34 +55,14 @@ class SnowflakeTableOperations extends BaseMetastoreTableOperations {
 
   @Override
   public void doRefresh() {
-    String location = null;
-    try {
-      LOG.debug("Getting metadata location for table {}", tableName());
-      location = getTableMetadataLocation();
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new UncheckedInterruptedException(e, "Interrupted during refresh");
-    } catch (SQLException e) {
-      // SQL exception happened when getting table from catalog
-      throw new UncheckedSQLException(
-          e, "Failed to get table %s from catalog %s", tableIdentifier, catalogName);
-    }
-
-    if (location == null || location.isEmpty()) {
-      if (currentMetadataLocation() != null) {
-        throw new NoSuchTableException(
-            "Failed to load table %s from catalog %s: dropped by another process",
-            tableIdentifier, catalogName);
-      } else {
-        this.disableRefresh();
-        return;
-      }
-    }
-
-    String newMetadataLocation = location;
+    LOG.debug("Getting metadata location for table {}", tableIdentifier);
+    String location = getTableMetadataLocation();
     Preconditions.checkState(
-        location != null, "Invalid table %s: metadata location is null", tableIdentifier);
-    refreshFromMetadataLocation(newMetadataLocation);
+        location != null && !location.isEmpty(),
+        "Got null or empty location %s for table %s",
+        location,
+        tableIdentifier);
+    refreshFromMetadataLocation(location);
   }
 
   @Override
@@ -98,8 +75,7 @@ class SnowflakeTableOperations extends BaseMetastoreTableOperations {
     return tableIdentifier.toString();
   }
 
-  private String getTableMetadataLocation()
-      throws UncheckedSQLException, SQLException, InterruptedException {
+  private String getTableMetadataLocation() {
     SnowflakeTableMetadata metadata = snowflakeClient.getTableMetadata(tableIdentifier);
 
     if (metadata == null) {

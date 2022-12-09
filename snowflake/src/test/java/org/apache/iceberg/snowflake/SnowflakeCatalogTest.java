@@ -134,8 +134,9 @@ public class SnowflakeCatalogTest {
   public void testListNamespaceWithinSchema() {
     String dbName = "DB_3";
     String schemaName = "SCHEMA_4";
-    List<Namespace> namespaces = catalog.listNamespaces(Namespace.of(dbName, schemaName));
-    Assert.assertEquals(Lists.newArrayList(Namespace.of(dbName, schemaName)), namespaces);
+    Assert.assertThrows(
+        IllegalArgumentException.class,
+        () -> catalog.listNamespaces(Namespace.of(dbName, schemaName)));
   }
 
   @Test
