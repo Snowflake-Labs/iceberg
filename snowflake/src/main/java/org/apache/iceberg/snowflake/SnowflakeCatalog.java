@@ -37,6 +37,7 @@ import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.jdbc.JdbcClientPool;
 import org.apache.iceberg.jdbc.UncheckedInterruptedException;
 import org.apache.iceberg.jdbc.UncheckedSQLException;
+import org.apache.iceberg.relocated.com.google.common.annotations.VisibleForTesting;
 import org.apache.iceberg.relocated.com.google.common.base.Preconditions;
 import org.apache.iceberg.relocated.com.google.common.collect.Lists;
 import org.apache.iceberg.relocated.com.google.common.collect.Maps;
@@ -54,21 +55,28 @@ public class SnowflakeCatalog extends BaseMetastoreCatalog
   private String catalogName = SnowflakeResources.DEFAULT_CATALOG_NAME;
   private Map<String, String> catalogProperties = null;
   private FileIO fileIO;
-  private QueryFactory queryFactory;
+  private SnowflakeClient snowflakeClient;
 
   public SnowflakeCatalog() {}
 
-  public void setQueryFactory(QueryFactory factory) {
-    queryFactory = factory;
+  @VisibleForTesting
+  void setSnowflakeClient(SnowflakeClient snowflakeClient) {
+    this.snowflakeClient = snowflakeClient;
+  }
+
+  @VisibleForTesting
+  void setFileIO(FileIO fileIO) {
+    this.fileIO = fileIO;
   }
 
   @Override
   public List<TableIdentifier> listTables(Namespace namespace) {
+    LOG.debug("listTables with namespace: {}", namespace);
     Preconditions.checkArgument(
         namespace.length() <= SnowflakeResources.MAX_NAMESPACE_DEPTH,
         "Snowflake doesn't supports more than 2 levels of namespace");
 
-    List<SnowflakeTable> sfTables = queryFactory.listIcebergTables(namespace);
+    List<SnowflakeTable> sfTables = snowflakeClient.listIcebergTables(namespace);
 
     return sfTables.stream()
         .map(
@@ -89,33 +97,31 @@ public class SnowflakeCatalog extends BaseMetastoreCatalog
   public void initialize(String name, Map<String, String> properties) {
     catalogProperties = properties;
 
-    String uri = properties.get(CatalogProperties.URI);
-    Preconditions.checkNotNull(uri, "JDBC connection URI is required");
-
     if (name != null) {
       this.catalogName = name;
     }
 
-    LOG.debug("Connecting to JDBC database {}", properties.get(CatalogProperties.URI));
-
-    JdbcClientPool connectionPool = new JdbcClientPool(uri, properties);
-
-    if (queryFactory == null) {
-      queryFactory = new SnowflakeQueryFactory(connectionPool);
+    if (snowflakeClient == null) {
+      String uri = properties.get(CatalogProperties.URI);
+      Preconditions.checkNotNull(uri, "JDBC connection URI is required");
+      JdbcClientPool connectionPool = new JdbcClientPool(uri, properties);
+      snowflakeClient = new JdbcSnowflakeClient(connectionPool);
     }
 
-    String fileIOImpl = SnowflakeResources.DEFAULT_FILE_IO_IMPL;
+    if (fileIO == null) {
+      String fileIOImpl = SnowflakeResources.DEFAULT_FILE_IO_IMPL;
 
-    if (null != catalogProperties.get(CatalogProperties.FILE_IO_IMPL)) {
-      fileIOImpl = catalogProperties.get(CatalogProperties.FILE_IO_IMPL);
+      if (null != catalogProperties.get(CatalogProperties.FILE_IO_IMPL)) {
+        fileIOImpl = catalogProperties.get(CatalogProperties.FILE_IO_IMPL);
+      }
+
+      fileIO = CatalogUtil.loadFileIO(fileIOImpl, catalogProperties, conf);
     }
-
-    fileIO = CatalogUtil.loadFileIO(fileIOImpl, catalogProperties, conf);
   }
 
   @Override
   public void close() {
-    queryFactory.close();
+    snowflakeClient.close();
   }
 
   @Override
@@ -123,12 +129,13 @@ public class SnowflakeCatalog extends BaseMetastoreCatalog
 
   @Override
   public List<Namespace> listNamespaces(Namespace namespace) {
+    LOG.debug("listNamespaces with namespace: {}", namespace);
     Preconditions.checkArgument(
         namespace.length() <= SnowflakeResources.MAX_NAMESPACE_DEPTH,
         "Snowflake doesn't supports more than 2 levels of namespace");
     List<Namespace> namespaceList = Lists.newArrayList();
     try {
-      List<SnowflakeSchema> sfSchemas = queryFactory.listSchemas(namespace);
+      List<SnowflakeSchema> sfSchemas = snowflakeClient.listSchemas(namespace);
       namespaceList =
           sfSchemas.stream()
               .map(schema -> Namespace.of(schema.getDatabase(), schema.getName()))
@@ -152,6 +159,7 @@ public class SnowflakeCatalog extends BaseMetastoreCatalog
   @Override
   public Map<String, String> loadNamespaceMetadata(Namespace namespace)
       throws NoSuchNamespaceException {
+    LOG.debug("loadNamespaceMetadata with namespace: {}", namespace);
     List<Namespace> allNamespaces = listNamespaces(namespace);
 
     if (allNamespaces.size() == 0) {
@@ -185,7 +193,7 @@ public class SnowflakeCatalog extends BaseMetastoreCatalog
         "Snowflake doesn't supports more than 2 levels of namespace");
 
     return new SnowflakeTableOperations(
-        queryFactory, fileIO, catalogProperties, catalogName, tableIdentifier);
+        snowflakeClient, fileIO, catalogProperties, catalogName, tableIdentifier);
   }
 
   @Override

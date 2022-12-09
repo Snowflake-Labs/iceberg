@@ -23,9 +23,15 @@ import org.apache.commons.dbutils.ResultSetHandler;
 import org.apache.iceberg.relocated.com.google.common.collect.Lists;
 
 public class SnowflakeTable {
-  private String name;
   private String databaseName;
   private String schemaName;
+  private String name;
+
+  public SnowflakeTable(String databaseName, String schemaName, String name) {
+    this.databaseName = databaseName;
+    this.schemaName = schemaName;
+    this.name = name;
+  }
 
   public String getName() {
     return name;
@@ -41,15 +47,14 @@ public class SnowflakeTable {
 
   public static ResultSetHandler<List<SnowflakeTable>> createHandler() {
     return rs -> {
-      List<SnowflakeTable> schemas = Lists.newArrayList();
+      List<SnowflakeTable> tables = Lists.newArrayList();
       while (rs.next()) {
-        SnowflakeTable schema = new SnowflakeTable();
-        schema.name = rs.getString("name");
-        schema.databaseName = rs.getString("database_name");
-        schema.schemaName = rs.getString("schema_name");
-        schemas.add(schema);
+        String databaseName = rs.getString("database_name");
+        String schemaName = rs.getString("schema_name");
+        String name = rs.getString("name");
+        tables.add(new SnowflakeTable(databaseName, schemaName, name));
       }
-      return schemas;
+      return tables;
     };
   }
 }
