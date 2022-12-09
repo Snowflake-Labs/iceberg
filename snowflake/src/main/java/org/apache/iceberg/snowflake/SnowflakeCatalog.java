@@ -141,8 +141,9 @@ public class SnowflakeCatalog extends BaseMetastoreCatalog
         "Snowflake doesn't support more than %s levels of namespace, tried to list under %s",
         SnowflakeResources.MAX_NAMESPACE_DEPTH,
         namespace);
-    List<Namespace> namespaceList = Lists.newArrayList();
     List<SnowflakeSchema> sfSchemas = snowflakeClient.listSchemas(namespace);
+
+    List<Namespace> namespaceList = Lists.newArrayList();
     namespaceList =
         sfSchemas.stream()
             .map(schema -> Namespace.of(schema.getDatabase(), schema.getName()))
