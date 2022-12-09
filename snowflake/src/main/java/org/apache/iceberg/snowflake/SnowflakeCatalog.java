@@ -36,7 +36,6 @@ import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.jdbc.JdbcClientPool;
 import org.apache.iceberg.relocated.com.google.common.annotations.VisibleForTesting;
 import org.apache.iceberg.relocated.com.google.common.base.Preconditions;
-import org.apache.iceberg.relocated.com.google.common.collect.Lists;
 import org.apache.iceberg.relocated.com.google.common.collect.Maps;
 import org.apache.iceberg.snowflake.entities.SnowflakeSchema;
 import org.apache.iceberg.snowflake.entities.SnowflakeTable;
@@ -114,7 +113,7 @@ public class SnowflakeCatalog extends BaseMetastoreCatalog
     if (fileIO == null) {
       String fileIOImpl = SnowflakeResources.DEFAULT_FILE_IO_IMPL;
 
-      if (null != catalogProperties.get(CatalogProperties.FILE_IO_IMPL)) {
+      if (catalogProperties.containsKey(CatalogProperties.FILE_IO_IMPL)) {
         fileIOImpl = catalogProperties.get(CatalogProperties.FILE_IO_IMPL);
       }
 
@@ -143,12 +142,10 @@ public class SnowflakeCatalog extends BaseMetastoreCatalog
         namespace);
     List<SnowflakeSchema> sfSchemas = snowflakeClient.listSchemas(namespace);
 
-    List<Namespace> namespaceList = Lists.newArrayList();
-    namespaceList =
+    List<Namespace> namespaceList =
         sfSchemas.stream()
             .map(schema -> Namespace.of(schema.getDatabase(), schema.getName()))
             .collect(Collectors.toList());
-
     return namespaceList;
   }
 
