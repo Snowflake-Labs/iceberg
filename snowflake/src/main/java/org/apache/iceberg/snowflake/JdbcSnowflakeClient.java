@@ -33,12 +33,12 @@ import org.apache.iceberg.snowflake.entities.SnowflakeTableMetadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class SnowflakeQueryFactory implements QueryFactory {
+public class JdbcSnowflakeClient implements SnowflakeClient {
 
-  private static final Logger LOG = LoggerFactory.getLogger(SnowflakeQueryFactory.class);
+  private static final Logger LOG = LoggerFactory.getLogger(JdbcSnowflakeClient.class);
   private final JdbcClientPool connectionPool;
 
-  SnowflakeQueryFactory(JdbcClientPool conn) {
+  JdbcSnowflakeClient(JdbcClientPool conn) {
     connectionPool = conn;
   }
 

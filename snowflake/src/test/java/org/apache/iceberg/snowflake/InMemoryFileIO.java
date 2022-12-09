@@ -18,26 +18,24 @@
  */
 package org.apache.iceberg.snowflake;
 
-import java.io.IOException;
-import java.net.URISyntaxException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.util.Map;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.InMemoryInputFile;
 import org.apache.iceberg.io.InputFile;
 import org.apache.iceberg.io.OutputFile;
+import org.apache.iceberg.relocated.com.google.common.collect.Maps;
 
-public class TestFileIO implements FileIO {
+public class InMemoryFileIO implements FileIO {
+
+  private Map<String, InMemoryInputFile> inMemoryFiles = Maps.newHashMap();
+
+  public void addFile(String path, byte[] contents) {
+    inMemoryFiles.put(path, new InMemoryInputFile(path, contents));
+  }
+
   @Override
   public InputFile newInputFile(String path) {
-    try {
-      Path filePath = Paths.get(getClass().getClassLoader().getResource(path).toURI());
-      byte[] data = Files.readAllBytes(filePath);
-      return (InputFile) new InMemoryInputFile(filePath.toString(), data);
-    } catch (URISyntaxException | IOException e) {
-      throw new RuntimeException(e);
-    }
+    return inMemoryFiles.get(path);
   }
 
   @Override

@@ -19,6 +19,7 @@
 package org.apache.iceberg.snowflake.entities;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.io.IOException;
 import org.apache.commons.dbutils.ResultSetHandler;
 import org.apache.iceberg.util.JsonUtil;
 
@@ -26,7 +27,13 @@ public class SnowflakeTableMetadata {
   private String metadataLocation;
   private String status;
 
-  private String jsonVal;
+  private String rawJsonVal;
+
+  public SnowflakeTableMetadata(String metadataLocation, String status, String rawJsonVal) {
+    this.metadataLocation = metadataLocation;
+    this.status = status;
+    this.rawJsonVal = rawJsonVal;
+  }
 
   public String getMetadataLocation() {
     return metadataLocation;
@@ -36,33 +43,31 @@ public class SnowflakeTableMetadata {
     return status;
   }
 
+  /**
+   * Factory method for parsing a JSON string containing expected Snowflake table metadata into a
+   * SnowflakeTableMetadata object.
+   */
+  public static SnowflakeTableMetadata parseJson(String json) {
+    JsonNode parsedVal;
+    try {
+      parsedVal = JsonUtil.mapper().readValue(json, JsonNode.class);
+    } catch (IOException ioe) {
+      throw new IllegalArgumentException(String.format("Malformed JSON: %s", json), ioe);
+    }
+
+    String metadataLocation = JsonUtil.getString("metadataLocation", parsedVal);
+    String status = JsonUtil.getStringOrNull("status", parsedVal);
+    return new SnowflakeTableMetadata(metadataLocation, status, json);
+  }
+
   public static ResultSetHandler<SnowflakeTableMetadata> createHandler() {
     return rs -> {
       if (!rs.next()) {
         return null;
       }
 
-      SnowflakeTableMetadata schema = new SnowflakeTableMetadata();
-      schema.jsonVal = rs.getString("LOCATION");
-      schema.metadataLocation = getMetadataLocationFromJson(schema.jsonVal);
-      schema.status = getStatusFromJson(schema.jsonVal);
-      return schema;
+      String rawJsonVal = rs.getString("LOCATION");
+      return SnowflakeTableMetadata.parseJson(rawJsonVal);
     };
-  }
-
-  public static String getMetadataLocationFromJson(String json) {
-    return JsonUtil.parse(json, SnowflakeTableMetadata::getMetadataLocationFromJson);
-  }
-
-  public static String getMetadataLocationFromJson(JsonNode json) {
-    return JsonUtil.getString("metadataLocation", json);
-  }
-
-  public static String getStatusFromJson(String json) {
-    return JsonUtil.parse(json, SnowflakeTableMetadata::getStatusFromJson);
-  }
-
-  public static String getStatusFromJson(JsonNode json) {
-    return JsonUtil.getString("status", json);
   }
 }

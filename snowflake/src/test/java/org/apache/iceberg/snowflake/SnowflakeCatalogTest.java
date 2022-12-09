@@ -18,103 +18,97 @@
  */
 package org.apache.iceberg.snowflake;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.URISyntaxException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Scanner;
-import java.util.UUID;
-import org.apache.iceberg.CatalogProperties;
+import org.apache.iceberg.PartitionSpec;
+import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
+import org.apache.iceberg.TableMetadata;
+import org.apache.iceberg.TableMetadataParser;
+import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
-import org.apache.iceberg.jdbc.JdbcClientPool;
+import org.apache.iceberg.relocated.com.google.common.collect.ImmutableMap;
 import org.apache.iceberg.relocated.com.google.common.collect.Lists;
 import org.apache.iceberg.relocated.com.google.common.collect.Maps;
+import org.apache.iceberg.snowflake.entities.SnowflakeTableMetadata;
+import org.apache.iceberg.types.Types;
 import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.ClassRule;
+import org.junit.Before;
 import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
 
 public class SnowflakeCatalogTest {
 
-  public SnowflakeCatalogTest() {}
-
   static final String TEST_CATALOG_NAME = "slushLog";
-  static final String TEST_SETUP_SCRIPT = "setup_mock_snowflakedb.sql";
+  private SnowflakeCatalog catalog;
 
-  static final String TEST_CUSTOM_FILE_IO = "org.apache.iceberg.snowflake.TestFileIO";
-  static String uri;
-  static SnowflakeCatalog catalog;
+  @Before
+  public void before() {
+    catalog = new SnowflakeCatalog();
 
-  @ClassRule public static TemporaryFolder folder = new TemporaryFolder();
+    FakeSnowflakeClient client = new FakeSnowflakeClient();
+    client.addTable(
+        "DB_1",
+        "SCHEMA_1",
+        "TAB_1",
+        SnowflakeTableMetadata.parseJson(
+            "{\"metadataLocation\":\"s3://tab1/metadata/v3.metadata.json\",\"status\":\"success\"}"));
+    client.addTable(
+        "DB_1",
+        "SCHEMA_1",
+        "TAB_2",
+        SnowflakeTableMetadata.parseJson(
+            "{\"metadataLocation\":\"s3://tab2/metadata/v1.metadata.json\",\"status\":\"success\"}"));
+    client.addTable(
+        "DB_2",
+        "SCHEMA_2",
+        "TAB_3",
+        SnowflakeTableMetadata.parseJson(
+            "{\"metadataLocation\":\"s3://tab3/metadata/v334.metadata.json\",\"status\":\"success\"}"));
+    client.addTable(
+        "DB_2",
+        "SCHEMA_2",
+        "TAB_4",
+        SnowflakeTableMetadata.parseJson(
+            "{\"metadataLocation\":\"s3://tab4/metadata/v323.metadata.json\",\"status\":\"success\"}"));
+    client.addTable(
+        "DB_3",
+        "SCHEMA_3",
+        "TAB_5",
+        SnowflakeTableMetadata.parseJson(
+            "{\"metadataLocation\":\"s3://tab5/metadata/v793.metadata.json\",\"status\":\"success\"}"));
+    client.addTable(
+        "DB_3",
+        "SCHEMA_4",
+        "TAB_6",
+        SnowflakeTableMetadata.parseJson(
+            "{\"metadataLocation\":\"s3://tab6/metadata/v123.metadata.json\",\"status\":\"success\"}"));
 
-  @BeforeClass
-  public static void beforeClass() {
+    catalog.setSnowflakeClient(client);
 
-    File dbFile;
-    try {
-      dbFile = folder.newFile(UUID.randomUUID().toString().replace("-", "") + ".db");
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
+    InMemoryFileIO fakeFileIO = new InMemoryFileIO();
+
+    Schema schema =
+        new Schema(
+            Types.NestedField.required(1, "x", Types.StringType.get(), "comment1"),
+            Types.NestedField.required(2, "y", Types.StringType.get(), "comment2"));
+    PartitionSpec partitionSpec =
+        PartitionSpec.builderFor(schema).identity("x").withSpecId(1000).build();
+    Map<String, String> tableLocationProperties =
+        ImmutableMap.of(
+            TableProperties.WRITE_DATA_LOCATION, "s3://writeDataLoc",
+            TableProperties.WRITE_METADATA_LOCATION, "s3://writeMetaDataLoc");
+    TableMetadata tableMetadata =
+        TableMetadata.newTableMetadata(
+            schema, partitionSpec, "s3://tab1/", tableLocationProperties);
+    fakeFileIO.addFile(
+        "s3://tab1/metadata/v3.metadata.json",
+        TableMetadataParser.toJson(tableMetadata).getBytes());
+
+    catalog.setFileIO(fakeFileIO);
 
     Map<String, String> properties = Maps.newHashMap();
-
-    uri = "jdbc:sqlite:" + dbFile.getAbsolutePath();
-
-    properties.put(CatalogProperties.URI, uri);
-
-    properties.put(CatalogProperties.FILE_IO_IMPL, TEST_CUSTOM_FILE_IO);
-
-    try {
-      Connection con = DriverManager.getConnection(uri);
-      Path path =
-          Paths.get(
-              Objects.requireNonNull(
-                      SnowflakeCatalogTest.class.getClassLoader().getResource(TEST_SETUP_SCRIPT))
-                  .toURI());
-      importSQLScript(con, new FileInputStream(path.toFile()));
-
-      catalog = new SnowflakeCatalog();
-      JdbcClientPool connectionPool = new JdbcClientPool(uri, properties);
-      catalog.setQueryFactory(new TestQueryFactory(connectionPool));
-      catalog.initialize(TEST_CATALOG_NAME, properties);
-      con.close();
-    } catch (SQLException | URISyntaxException | FileNotFoundException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  static void importSQLScript(Connection conn, InputStream in) throws SQLException {
-    Scanner scan = new Scanner(in);
-    String delimiterPattern = "(;(\r)?\n)|(--\n)";
-    scan.useDelimiter(delimiterPattern);
-    try (Statement st = conn.createStatement()) {
-      while (scan.hasNext()) {
-        String line = scan.next();
-        if (line.startsWith("/*!") && line.endsWith("*/")) {
-          int index = line.indexOf(' ');
-          line = line.substring(index + 1, line.length() - " */".length());
-        }
-
-        if (line.trim().length() > 0) {
-          st.execute(line);
-        }
-      }
-    }
+    catalog.initialize(TEST_CATALOG_NAME, properties);
   }
 
   @Test
@@ -184,6 +178,6 @@ public class SnowflakeCatalogTest {
   @Test
   public void testLoadTable() {
     Table table = catalog.loadTable(TableIdentifier.of(Namespace.of("DB_1", "SCHEMA_1"), "TAB_1"));
-    Assert.assertEquals(table.location(), "tab_1/");
+    Assert.assertEquals(table.location(), "s3://tab1/");
   }
 }

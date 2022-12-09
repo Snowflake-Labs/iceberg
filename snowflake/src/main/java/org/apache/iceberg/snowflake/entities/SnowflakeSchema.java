@@ -26,6 +26,11 @@ public class SnowflakeSchema {
   private String name;
   private String databaseName;
 
+  public SnowflakeSchema(String databaseName, String name) {
+    this.databaseName = databaseName;
+    this.name = name;
+  }
+
   public String getName() {
     return name;
   }
@@ -38,10 +43,9 @@ public class SnowflakeSchema {
     return rs -> {
       List<SnowflakeSchema> schemas = Lists.newArrayList();
       while (rs.next()) {
-        SnowflakeSchema schema = new SnowflakeSchema();
-        schema.name = rs.getString("name");
-        schema.databaseName = rs.getString("database_name");
-        schemas.add(schema);
+        String databaseName = rs.getString("database_name");
+        String name = rs.getString("name");
+        schemas.add(new SnowflakeSchema(databaseName, name));
       }
       return schemas;
     };

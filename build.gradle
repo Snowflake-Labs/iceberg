@@ -694,7 +694,6 @@ project(':iceberg-snowflake') {
 
     runtimeOnly("net.snowflake:snowflake-jdbc:3.13.22")
 
-    testImplementation "org.xerial:sqlite-jdbc"
     testImplementation project(path: ':iceberg-core', configuration: 'testArtifacts')
   }
 }

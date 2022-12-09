@@ -39,17 +39,17 @@ class SnowflakeTableOperations extends BaseMetastoreTableOperations {
   private final FileIO fileIO;
   private final TableIdentifier tableIdentifier;
 
-  private final QueryFactory queryFactory;
+  private final SnowflakeClient snowflakeClient;
 
   private final Map<String, String> catalogProperties;
 
   protected SnowflakeTableOperations(
-      QueryFactory queryFactory,
+      SnowflakeClient snowflakeClient,
       FileIO fileIO,
       Map<String, String> properties,
       String catalogName,
       TableIdentifier tableIdentifier) {
-    this.queryFactory = queryFactory;
+    this.snowflakeClient = snowflakeClient;
     this.fileIO = fileIO;
     this.catalogProperties = properties;
     this.catalogName = catalogName;
@@ -100,7 +100,7 @@ class SnowflakeTableOperations extends BaseMetastoreTableOperations {
 
   private String getTableMetadataLocation()
       throws UncheckedSQLException, SQLException, InterruptedException {
-    SnowflakeTableMetadata metadata = queryFactory.getTableMetadata(tableIdentifier);
+    SnowflakeTableMetadata metadata = snowflakeClient.getTableMetadata(tableIdentifier);
 
     if (metadata == null) {
       throw new NoSuchTableException("Cannot find table %s", tableIdentifier);

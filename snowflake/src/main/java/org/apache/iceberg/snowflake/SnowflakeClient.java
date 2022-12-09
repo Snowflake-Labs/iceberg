@@ -26,12 +26,13 @@ import org.apache.iceberg.snowflake.entities.SnowflakeSchema;
 import org.apache.iceberg.snowflake.entities.SnowflakeTable;
 import org.apache.iceberg.snowflake.entities.SnowflakeTableMetadata;
 
-public interface QueryFactory extends Closeable {
+public interface SnowflakeClient extends Closeable {
   List<SnowflakeSchema> listSchemas(Namespace namespace);
 
   List<SnowflakeTable> listIcebergTables(Namespace namespace);
 
   SnowflakeTableMetadata getTableMetadata(TableIdentifier tableIdentifier);
 
+  @Override
   void close();
 }
