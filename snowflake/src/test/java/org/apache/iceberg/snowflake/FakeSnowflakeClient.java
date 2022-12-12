@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.jdbc.UncheckedSQLException;
 import org.apache.iceberg.relocated.com.google.common.base.Preconditions;
 import org.apache.iceberg.relocated.com.google.common.collect.Lists;
 import org.apache.iceberg.relocated.com.google.common.collect.Maps;
@@ -75,17 +76,13 @@ public class FakeSnowflakeClient implements SnowflakeClient {
         for (String schema : databases.get(dbName).keySet()) {
           schemas.add(new SnowflakeSchema(dbName, schema));
         }
+      } else {
+        throw new UncheckedSQLException("Nonexistent database: '%s'", dbName);
       }
     } else {
-      // When the input is already a specific database.schema, the behavior is simply to check
-      // if the given schema exists and return no results if it doesn't exist.
-      String dbName = namespace.level(SnowflakeResources.NAMESPACE_DB_LEVEL - 1);
-      if (databases.containsKey(dbName)) {
-        String schemaName = namespace.level(SnowflakeResources.NAMESPACE_SCHEMA_LEVEL - 1);
-        if (databases.get(dbName).containsKey(schemaName)) {
-          schemas.add(new SnowflakeSchema(dbName, schemaName));
-        }
-      }
+      throw new IllegalArgumentException(
+          String.format(
+              "Tried to listSchemas using a namespace with too many levels: '%s'", namespace));
     }
     return schemas;
   }
@@ -118,6 +115,8 @@ public class FakeSnowflakeClient implements SnowflakeClient {
             tables.add(new SnowflakeTable(dbName, schema.getKey(), tableName));
           }
         }
+      } else {
+        throw new UncheckedSQLException("Nonexistent database: '%s'", dbName);
       }
     } else {
       String dbName = namespace.level(SnowflakeResources.NAMESPACE_DB_LEVEL - 1);
@@ -127,7 +126,12 @@ public class FakeSnowflakeClient implements SnowflakeClient {
           for (String tableName : databases.get(dbName).get(schemaName).keySet()) {
             tables.add(new SnowflakeTable(dbName, schemaName, tableName));
           }
+        } else {
+          throw new UncheckedSQLException(
+              "Nonexistent datbase.schema: '%s.%s'", dbName, schemaName);
         }
+      } else {
+        throw new UncheckedSQLException("Nonexistent database: '%s'", dbName);
       }
     }
     return tables;
@@ -141,10 +145,14 @@ public class FakeSnowflakeClient implements SnowflakeClient {
         "TableIdentifier {} must have namespace of length {}",
         tableIdentifier,
         SnowflakeResources.MAX_NAMESPACE_DEPTH);
-    return databases
-        .get(ns.level(SnowflakeResources.NAMESPACE_DB_LEVEL - 1))
-        .get(ns.level(SnowflakeResources.NAMESPACE_SCHEMA_LEVEL - 1))
-        .get(tableIdentifier.name());
+    String dbName = ns.level(SnowflakeResources.NAMESPACE_DB_LEVEL - 1);
+    String schemaName = ns.level(SnowflakeResources.NAMESPACE_SCHEMA_LEVEL - 1);
+    if (!databases.containsKey(dbName)
+        || !databases.get(dbName).containsKey(schemaName)
+        || !databases.get(dbName).get(schemaName).containsKey(tableIdentifier.name())) {
+      throw new UncheckedSQLException("Nonexistent object: '%s'", tableIdentifier);
+    }
+    return databases.get(dbName).get(schemaName).get(tableIdentifier.name());
   }
 
   @Override

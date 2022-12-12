@@ -106,6 +106,22 @@ public class SnowflakeCatalog extends BaseMetastoreCatalog
     if (snowflakeClient == null) {
       String uri = properties.get(CatalogProperties.URI);
       Preconditions.checkNotNull(uri, "JDBC connection URI is required");
+
+      try {
+        // We'll ensure the expected JDBC driver implementation class is initialized through
+        // reflection
+        // regardless of which classloader ends up using this JdbcSnowflakeClient, but we'll only
+        // warn if the expected driver fails to load, since users may use repackaged or custom
+        // JDBC drivers for Snowflake communcation.
+        Class.forName(JdbcSnowflakeClient.EXPECTED_JDBC_IMPL);
+      } catch (ClassNotFoundException cnfe) {
+        LOG.warn(
+            "Failed to load expected JDBC SnowflakeDriver - if queries fail by failing"
+                + " to find a suitable driver for jdbc:snowflake:// URIs, you must add the Snowflake "
+                + " JDBC driver to your jars/packages",
+            cnfe);
+      }
+
       JdbcClientPool connectionPool = new JdbcClientPool(uri, properties);
       snowflakeClient = new JdbcSnowflakeClient(connectionPool);
     }

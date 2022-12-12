@@ -81,10 +81,13 @@ class SnowflakeTableOperations extends BaseMetastoreTableOperations {
     if (metadata == null) {
       throw new NoSuchTableException("Cannot find table %s", tableIdentifier);
     }
-    Preconditions.checkState(
-        metadata.getStatus().equals("success"),
-        "Could not retrieve metadata location for table : %s",
-        tableIdentifier);
-    return metadata.getMetadataLocation();
+    if (!metadata.getStatus().equals("success")) {
+      LOG.warn(
+          "Got non-successful table metadata: {} with metadataLocation {} for table {}",
+          metadata.getStatus(),
+          metadata.getIcebergMetadataLocation(),
+          tableIdentifier);
+    }
+    return metadata.getIcebergMetadataLocation();
   }
 }

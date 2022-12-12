@@ -43,6 +43,7 @@ import org.slf4j.LoggerFactory;
  * resource model.
  */
 public class JdbcSnowflakeClient implements SnowflakeClient {
+  public static final String EXPECTED_JDBC_IMPL = "net.snowflake.client.jdbc.SnowflakeDriver";
 
   private static final Logger LOG = LoggerFactory.getLogger(JdbcSnowflakeClient.class);
   private final JdbcClientPool connectionPool;
@@ -53,15 +54,15 @@ public class JdbcSnowflakeClient implements SnowflakeClient {
 
   @Override
   public List<SnowflakeSchema> listSchemas(Namespace namespace) {
-    StringBuilder baseQuery = new StringBuilder("show schemas");
+    StringBuilder baseQuery = new StringBuilder("SHOW SCHEMAS");
     Object[] queryParams = null;
     if (namespace == null || namespace.isEmpty()) {
       // for empty or null namespace search for all schemas at account level where the user
       // has access to list.
-      baseQuery.append(" in account");
+      baseQuery.append(" IN ACCOUNT");
     } else {
       // otherwise restrict listing of schema within the database.
-      baseQuery.append(" in database identifier(?)");
+      baseQuery.append(" IN DATABASE IDENTIFIER(?)");
       queryParams = new Object[] {namespace.level(SnowflakeResources.NAMESPACE_DB_LEVEL - 1)};
     }
 
@@ -87,11 +88,11 @@ public class JdbcSnowflakeClient implements SnowflakeClient {
 
   @Override
   public List<SnowflakeTable> listIcebergTables(Namespace namespace) {
-    StringBuilder baseQuery = new StringBuilder("show iceberg tables");
+    StringBuilder baseQuery = new StringBuilder("SHOW ICEBERG TABLES");
     Object[] queryParams = null;
     if (namespace.length() == SnowflakeResources.MAX_NAMESPACE_DEPTH) {
       // For two level namespace, search for iceberg tables within the given schema.
-      baseQuery.append(" in schema identifier(?)");
+      baseQuery.append(" IN SCHEMA IDENTIFIER(?)");
       queryParams =
           new Object[] {
             String.format(
@@ -101,11 +102,11 @@ public class JdbcSnowflakeClient implements SnowflakeClient {
           };
     } else if (namespace.length() == SnowflakeResources.NAMESPACE_DB_LEVEL) {
       // For one level namespace, search for iceberg tables within the given database.
-      baseQuery.append(" in database identifier(?)");
+      baseQuery.append(" IN DATABASE IDENTIFIER(?)");
       queryParams = new Object[] {namespace.level(SnowflakeResources.NAMESPACE_DB_LEVEL - 1)};
     } else {
       // For empty or db level namespace, search at account level.
-      baseQuery.append(" in account");
+      baseQuery.append(" IN ACCOUNT");
     }
 
     final String finalQuery = baseQuery.toString();
@@ -132,7 +133,7 @@ public class JdbcSnowflakeClient implements SnowflakeClient {
 
     SnowflakeTableMetadata tableMeta;
     try {
-      final String finalQuery = "select SYSTEM$GET_ICEBERG_TABLE_INFORMATION(?) as location";
+      final String finalQuery = "SELECT SYSTEM$GET_ICEBERG_TABLE_INFORMATION(?) AS METADATA";
       tableMeta =
           connectionPool.run(
               conn ->

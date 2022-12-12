@@ -19,6 +19,7 @@
 package org.apache.iceberg.snowflake;
 
 import java.util.Map;
+import org.apache.iceberg.exceptions.NotFoundException;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.InMemoryInputFile;
 import org.apache.iceberg.io.InputFile;
@@ -35,6 +36,9 @@ public class InMemoryFileIO implements FileIO {
 
   @Override
   public InputFile newInputFile(String path) {
+    if (!inMemoryFiles.containsKey(path)) {
+      throw new NotFoundException("No in-memory file found for path: %s", path);
+    }
     return inMemoryFiles.get(path);
   }
 

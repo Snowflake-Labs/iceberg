@@ -25,7 +25,6 @@ import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableMetadataParser;
-import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.relocated.com.google.common.collect.ImmutableMap;
@@ -64,25 +63,25 @@ public class SnowflakeCatalogTest {
         "SCHEMA_2",
         "TAB_3",
         SnowflakeTableMetadata.parseJson(
-            "{\"metadataLocation\":\"s3://tab3/metadata/v334.metadata.json\",\"status\":\"success\"}"));
+            "{\"metadataLocation\":\"azure://myaccount.blob.core.windows.net/mycontainer/tab3/metadata/v334.metadata.json\",\"status\":\"success\"}"));
     client.addTable(
         "DB_2",
         "SCHEMA_2",
         "TAB_4",
         SnowflakeTableMetadata.parseJson(
-            "{\"metadataLocation\":\"s3://tab4/metadata/v323.metadata.json\",\"status\":\"success\"}"));
+            "{\"metadataLocation\":\"azure://myaccount.blob.core.windows.net/mycontainer/tab4/metadata/v323.metadata.json\",\"status\":\"success\"}"));
     client.addTable(
         "DB_3",
         "SCHEMA_3",
         "TAB_5",
         SnowflakeTableMetadata.parseJson(
-            "{\"metadataLocation\":\"s3://tab5/metadata/v793.metadata.json\",\"status\":\"success\"}"));
+            "{\"metadataLocation\":\"gcs://tab5/metadata/v793.metadata.json\",\"status\":\"success\"}"));
     client.addTable(
         "DB_3",
         "SCHEMA_4",
         "TAB_6",
         SnowflakeTableMetadata.parseJson(
-            "{\"metadataLocation\":\"s3://tab6/metadata/v123.metadata.json\",\"status\":\"success\"}"));
+            "{\"metadataLocation\":\"gcs://tab6/metadata/v123.metadata.json\",\"status\":\"success\"}"));
 
     catalog.setSnowflakeClient(client);
 
@@ -94,16 +93,27 @@ public class SnowflakeCatalogTest {
             Types.NestedField.required(2, "y", Types.StringType.get(), "comment2"));
     PartitionSpec partitionSpec =
         PartitionSpec.builderFor(schema).identity("x").withSpecId(1000).build();
-    Map<String, String> tableLocationProperties =
-        ImmutableMap.of(
-            TableProperties.WRITE_DATA_LOCATION, "s3://writeDataLoc",
-            TableProperties.WRITE_METADATA_LOCATION, "s3://writeMetaDataLoc");
-    TableMetadata tableMetadata =
-        TableMetadata.newTableMetadata(
-            schema, partitionSpec, "s3://tab1/", tableLocationProperties);
     fakeFileIO.addFile(
         "s3://tab1/metadata/v3.metadata.json",
-        TableMetadataParser.toJson(tableMetadata).getBytes());
+        TableMetadataParser.toJson(
+                TableMetadata.newTableMetadata(
+                    schema, partitionSpec, "s3://tab1/", ImmutableMap.<String, String>of()))
+            .getBytes());
+    fakeFileIO.addFile(
+        "wasbs://mycontainer@myaccount.blob.core.windows.net/tab3/metadata/v334.metadata.json",
+        TableMetadataParser.toJson(
+                TableMetadata.newTableMetadata(
+                    schema,
+                    partitionSpec,
+                    "wasbs://mycontainer@myaccount.blob.core.windows.net/tab1/",
+                    ImmutableMap.<String, String>of()))
+            .getBytes());
+    fakeFileIO.addFile(
+        "gs://tab5/metadata/v793.metadata.json",
+        TableMetadataParser.toJson(
+                TableMetadata.newTableMetadata(
+                    schema, partitionSpec, "gs://tab5/", ImmutableMap.<String, String>of()))
+            .getBytes());
 
     catalog.setFileIO(fakeFileIO);
 
@@ -131,7 +141,17 @@ public class SnowflakeCatalogTest {
   }
 
   @Test
+  public void testListNamespaceWithinNonExistentDB() {
+    // Existence check for nonexistent parent namespaces is optional in the SupportsNamespaces
+    // interface.
+    String dbName = "NONEXISTENT_DB";
+    Assert.assertThrows(RuntimeException.class, () -> catalog.listNamespaces(Namespace.of(dbName)));
+  }
+
+  @Test
   public void testListNamespaceWithinSchema() {
+    // No "sub-namespaces" beyond database.schema; invalid to try to list namespaces given
+    // a database.schema.
     String dbName = "DB_3";
     String schemaName = "SCHEMA_4";
     Assert.assertThrows(
@@ -165,6 +185,12 @@ public class SnowflakeCatalogTest {
   }
 
   @Test
+  public void testListTablesWithinNonexistentDB() {
+    String dbName = "NONEXISTENT_DB";
+    Assert.assertThrows(RuntimeException.class, () -> catalog.listTables(Namespace.of(dbName)));
+  }
+
+  @Test
   public void testListTablesWithinSchema() {
     String dbName = "DB_2";
     String schemaName = "SCHEMA_2";
@@ -177,8 +203,29 @@ public class SnowflakeCatalogTest {
   }
 
   @Test
-  public void testLoadTable() {
+  public void testListTablesWithinNonexistentSchema() {
+    String dbName = "DB_2";
+    String schemaName = "NONEXISTENT_DB";
+    Assert.assertThrows(
+        RuntimeException.class, () -> catalog.listTables(Namespace.of(dbName, schemaName)));
+  }
+
+  @Test
+  public void testLoadS3Table() {
     Table table = catalog.loadTable(TableIdentifier.of(Namespace.of("DB_1", "SCHEMA_1"), "TAB_1"));
     Assert.assertEquals(table.location(), "s3://tab1/");
+  }
+
+  @Test
+  public void testLoadAzureTable() {
+    Table table = catalog.loadTable(TableIdentifier.of(Namespace.of("DB_2", "SCHEMA_2"), "TAB_3"));
+    Assert.assertEquals(
+        table.location(), "wasbs://mycontainer@myaccount.blob.core.windows.net/tab1/");
+  }
+
+  @Test
+  public void testLoadGcsTable() {
+    Table table = catalog.loadTable(TableIdentifier.of(Namespace.of("DB_3", "SCHEMA_3"), "TAB_5"));
+    Assert.assertEquals(table.location(), "gs://tab5/");
   }
 }
