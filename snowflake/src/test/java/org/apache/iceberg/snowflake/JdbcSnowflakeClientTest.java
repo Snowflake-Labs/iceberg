@@ -89,6 +89,10 @@ public class JdbcSnowflakeClientTest {
             ArgumentMatchers.<Object>any());
   }
 
+  /**
+   * For the root/empty Namespace, expect an underlying query to list schemas at the ACCOUNT level
+   * with no query parameters.
+   */
   @Test
   public void testListSchemasInAccount() throws SQLException {
     when(mockResultSet.next()).thenReturn(true).thenReturn(true).thenReturn(true).thenReturn(false);
@@ -118,6 +122,10 @@ public class JdbcSnowflakeClientTest {
     Assertions.assertThat(actualList).hasSameElementsAs(expectedList);
   }
 
+  /**
+   * For a 1-level Namespace, expect an underlying query to list schemas at the DATABASE level and
+   * supply the Namespace as a query param in an IDENTIFIER.
+   */
   @Test
   public void testListSchemasInDatabase() throws SQLException {
     when(mockResultSet.next()).thenReturn(true).thenReturn(true).thenReturn(false);
@@ -139,6 +147,10 @@ public class JdbcSnowflakeClientTest {
     Assertions.assertThat(actualList).hasSameElementsAs(expectedList);
   }
 
+  /**
+   * Any unexpected SQLException from the underlying connection will propagate out as an
+   * UncheckedSQLException when listing schemas.
+   */
   @Test
   public void testListSchemasSQLException() throws SQLException, InterruptedException {
     when(mockClientPool.run(any(ClientPool.Action.class)))
@@ -147,6 +159,10 @@ public class JdbcSnowflakeClientTest {
         UncheckedSQLException.class, () -> snowflakeClient.listSchemas(Namespace.of("DB_1")));
   }
 
+  /**
+   * Any unexpected InterruptedException from the underlying connection will propagate out as an
+   * UncheckedInterruptedException when listing schemas.
+   */
   @Test
   public void testListSchemasInterruptedException() throws SQLException, InterruptedException {
     when(mockClientPool.run(any(ClientPool.Action.class)))
@@ -156,6 +172,10 @@ public class JdbcSnowflakeClientTest {
         () -> snowflakeClient.listSchemas(Namespace.of("DB_1")));
   }
 
+  /**
+   * For the root/empty Namespace, expect an underlying query to list tables at the ACCOUNT level
+   * with no query parameters.
+   */
   @Test
   public void testListIcebergTablesInAccount() throws SQLException {
     when(mockResultSet.next())
@@ -198,6 +218,10 @@ public class JdbcSnowflakeClientTest {
     Assertions.assertThat(actualList).hasSameElementsAs(expectedList);
   }
 
+  /**
+   * For a 1-level Namespace, expect an underlying query to list tables at the DATABASE level and
+   * supply the Namespace as a query param in an IDENTIFIER.
+   */
   @Test
   public void testListIcebergTablesInDatabase() throws SQLException {
     when(mockResultSet.next()).thenReturn(true).thenReturn(true).thenReturn(true).thenReturn(false);
@@ -231,6 +255,10 @@ public class JdbcSnowflakeClientTest {
     Assertions.assertThat(actualList).hasSameElementsAs(expectedList);
   }
 
+  /**
+   * For a 2-level Namespace, expect an underlying query to list tables at the SCHEMA level and
+   * supply the Namespace as a query param in an IDENTIFIER.
+   */
   @Test
   public void testListIcebergTablesInSchema() throws SQLException {
     when(mockResultSet.next()).thenReturn(true).thenReturn(true).thenReturn(false);
@@ -255,6 +283,10 @@ public class JdbcSnowflakeClientTest {
     Assertions.assertThat(actualList).hasSameElementsAs(expectedList);
   }
 
+  /**
+   * Any unexpected SQLException from the underlying connection will propagate out as an
+   * UncheckedSQLException when listing tables.
+   */
   @Test
   public void testListIcebergTablesSQLException() throws SQLException, InterruptedException {
     when(mockClientPool.run(any(ClientPool.Action.class)))
@@ -263,6 +295,10 @@ public class JdbcSnowflakeClientTest {
         UncheckedSQLException.class, () -> snowflakeClient.listIcebergTables(Namespace.of("DB_1")));
   }
 
+  /**
+   * Any unexpected InterruptedException from the underlying connection will propagate out as an
+   * UncheckedInterruptedException when listing tables.
+   */
   @Test
   public void testListIcebergTablesInterruptedException()
       throws SQLException, InterruptedException {
@@ -273,6 +309,10 @@ public class JdbcSnowflakeClientTest {
         () -> snowflakeClient.listIcebergTables(Namespace.of("DB_1")));
   }
 
+  /**
+   * Test parsing of table metadata JSON from a GET_ICEBERG_TABLE_INFORMATION call, with the S3 path
+   * unaltered between snowflake/iceberg path representations.
+   */
   @Test
   public void testGetS3TableMetadata() throws SQLException {
     when(mockResultSet.next()).thenReturn(true);
@@ -300,6 +340,10 @@ public class JdbcSnowflakeClientTest {
     Assert.assertEquals(expectedMetadata, actualMetadata);
   }
 
+  /**
+   * Test parsing of table metadata JSON from a GET_ICEBERG_TABLE_INFORMATION call, with the Azure
+   * path translated from an azure:// format to a wasbs:// format.
+   */
   @Test
   public void testGetAzureTableMetadata() throws SQLException {
     when(mockResultSet.next()).thenReturn(true);
@@ -327,6 +371,10 @@ public class JdbcSnowflakeClientTest {
     Assert.assertEquals(expectedMetadata, actualMetadata);
   }
 
+  /**
+   * Test parsing of table metadata JSON from a GET_ICEBERG_TABLE_INFORMATION call, with the GCS
+   * path translated from a gcs:// format to a gs:// format.
+   */
   @Test
   public void testGetGcsTableMetadata() throws SQLException {
     when(mockResultSet.next()).thenReturn(true);
@@ -354,6 +402,7 @@ public class JdbcSnowflakeClientTest {
     Assert.assertEquals(expectedMetadata, actualMetadata);
   }
 
+  /** Malformed JSON from a ResultSet should propagate as an IllegalArgumentException. */
   @Test
   public void testGetTableMetadataMalformedJson() throws SQLException {
     when(mockResultSet.next()).thenReturn(true);
@@ -365,6 +414,10 @@ public class JdbcSnowflakeClientTest {
                 TableIdentifier.of(Namespace.of("DB_1", "SCHEMA_1"), "TABLE_1")));
   }
 
+  /**
+   * Any unexpected SQLException from the underlying connection will propagate out as an
+   * UncheckedSQLException when getting table metadata.
+   */
   @Test
   public void testGetTableMetadataSQLException() throws SQLException, InterruptedException {
     when(mockClientPool.run(any(ClientPool.Action.class)))
@@ -376,6 +429,10 @@ public class JdbcSnowflakeClientTest {
                 TableIdentifier.of(Namespace.of("DB_1", "SCHEMA_1"), "TABLE_1")));
   }
 
+  /**
+   * Any unexpected InterruptedException from the underlying connection will propagate out as an
+   * UncheckedInterruptedException when getting table metadata.
+   */
   @Test
   public void testGetTableMetadataInterruptedException() throws SQLException, InterruptedException {
     when(mockClientPool.run(any(ClientPool.Action.class)))
@@ -387,6 +444,7 @@ public class JdbcSnowflakeClientTest {
                 TableIdentifier.of(Namespace.of("DB_1", "SCHEMA_1"), "TABLE_1")));
   }
 
+  /** Calling close() propagates to closing underlying client pool. */
   @Test
   public void testClose() {
     snowflakeClient.close();
