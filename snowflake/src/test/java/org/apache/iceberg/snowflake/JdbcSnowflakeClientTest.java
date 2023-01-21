@@ -79,7 +79,8 @@ public class JdbcSnowflakeClientTest {
   @Test
   public void testDatabaseExists() throws SQLException {
     when(mockResultSet.next()).thenReturn(true).thenReturn(false);
-    when(mockResultSet.getString("name")).thenReturn("DB_1");
+    when(mockResultSet.getString("database_name")).thenReturn("DB_1");
+    when(mockResultSet.getString("name")).thenReturn("SCHEMA_1");
 
     Assertions.assertThat(snowflakeClient.databaseExists(SnowflakeIdentifier.ofDatabase("DB_1")))
         .isTrue();
@@ -87,38 +88,33 @@ public class JdbcSnowflakeClientTest {
     verify(mockQueryHarness)
         .query(
             eq(mockConnection),
-            eq("SHOW DATABASES LIKE 'DB_1' IN ACCOUNT"),
-            any(JdbcSnowflakeClient.ResultSetParser.class));
+            eq("SHOW SCHEMAS IN IDENTIFIER(?) LIMIT 1"),
+            any(JdbcSnowflakeClient.ResultSetParser.class),
+            eq("\"DB_1\""));
   }
 
   @Test
   public void testDatabaseExistsSpecialCharacters() throws SQLException {
     when(mockResultSet.next()).thenReturn(true).thenReturn(false);
-    when(mockResultSet.getString("name")).thenReturn("$DB_1$.'!@#%^&*");
+    when(mockResultSet.getString("database_name")).thenReturn("$DB_1$.!@#%^&*");
+    when(mockResultSet.getString("name")).thenReturn("SCHEMA_1");
 
     Assertions.assertThat(
-            snowflakeClient.databaseExists(SnowflakeIdentifier.ofDatabase("$DB_1$.'!@#%^&*")))
+            snowflakeClient.databaseExists(SnowflakeIdentifier.ofDatabase("$DB_1$.!@#%^&*")))
         .isTrue();
 
     verify(mockQueryHarness)
         .query(
             eq(mockConnection),
-            eq("SHOW DATABASES LIKE '_DB_1$_________' IN ACCOUNT"),
-            any(JdbcSnowflakeClient.ResultSetParser.class));
+            eq("SHOW SCHEMAS IN IDENTIFIER(?) LIMIT 1"),
+            any(JdbcSnowflakeClient.ResultSetParser.class),
+            eq("\"$DB_1$.!@#%^&*\""));
   }
 
   @Test
-  public void testDatabaseDoesntExistNoResults() throws SQLException {
-    when(mockResultSet.next()).thenReturn(false);
-
-    Assertions.assertThat(snowflakeClient.databaseExists(SnowflakeIdentifier.ofDatabase("DB_1")))
-        .isFalse();
-  }
-
-  @Test
-  public void testDatabaseDoesntExistMismatchedResults() throws SQLException {
-    when(mockResultSet.next()).thenReturn(true).thenReturn(false);
-    when(mockResultSet.getString("name")).thenReturn("DBZ1");
+  public void testDatabaseDoesntExist() throws SQLException {
+    when(mockResultSet.next())
+        .thenThrow(new SQLException("Database does not exists", "2000", 2003, null));
 
     Assertions.assertThat(snowflakeClient.databaseExists(SnowflakeIdentifier.ofDatabase("DB_1")))
         .isFalse();
@@ -131,24 +127,26 @@ public class JdbcSnowflakeClientTest {
         .thenReturn(false)
         .thenReturn(true)
         .thenReturn(false);
-    when(mockResultSet.getString("name")).thenReturn("DB_1").thenReturn("SCHEMA_1");
-    when(mockResultSet.getString("database_name")).thenReturn("DB_1");
+    when(mockResultSet.getString("name")).thenReturn("DB1").thenReturn("SCHEMA1");
+    when(mockResultSet.getString("database_name")).thenReturn("DB1");
+    when(mockResultSet.getString("schema_name")).thenReturn("SCHEMA1");
 
     Assertions.assertThat(
-            snowflakeClient.schemaExists(SnowflakeIdentifier.ofSchema("DB_1", "SCHEMA_1")))
+            snowflakeClient.schemaExists(SnowflakeIdentifier.ofSchema("DB1", "SCHEMA1")))
         .isTrue();
 
     verify(mockQueryHarness)
         .query(
             eq(mockConnection),
-            eq("SHOW DATABASES LIKE 'DB_1' IN ACCOUNT"),
-            any(JdbcSnowflakeClient.ResultSetParser.class));
+            eq("SHOW SCHEMAS IN IDENTIFIER(?) LIMIT 1"),
+            any(JdbcSnowflakeClient.ResultSetParser.class),
+            eq("DB1"));
     verify(mockQueryHarness)
         .query(
             eq(mockConnection),
-            eq("SHOW SCHEMAS LIKE 'SCHEMA_1' IN DATABASE IDENTIFIER(?)"),
+            eq("SHOW TABLES IN IDENTIFIER(?) LIMIT 1"),
             any(JdbcSnowflakeClient.ResultSetParser.class),
-            eq("DB_1"));
+            eq("DB1.SCHEMA1"));
   }
 
   @Test
@@ -158,60 +156,46 @@ public class JdbcSnowflakeClientTest {
         .thenReturn(false)
         .thenReturn(true)
         .thenReturn(false);
-    when(mockResultSet.getString("name")).thenReturn("DB_1").thenReturn("$SCHEMA_1$.'!@#%^&*");
-    when(mockResultSet.getString("database_name")).thenReturn("DB_1");
+    when(mockResultSet.getString("name")).thenReturn("$SCHEMA_1$.!@#%^&*").thenReturn("Table1");
+    when(mockResultSet.getString("database_name")).thenReturn("DB_1").thenReturn("DB_1");
+    when(mockResultSet.getString("schema_name")).thenReturn("$SCHEMA_1$.!@#%^&*");
 
     Assertions.assertThat(
             snowflakeClient.schemaExists(
-                SnowflakeIdentifier.ofSchema("DB_1", "$SCHEMA_1$.'!@#%^&*")))
+                SnowflakeIdentifier.ofSchema("DB_1", "$SCHEMA_1$.!@#%^&*")))
         .isTrue();
 
     verify(mockQueryHarness)
         .query(
             eq(mockConnection),
-            eq("SHOW DATABASES LIKE 'DB_1' IN ACCOUNT"),
-            any(JdbcSnowflakeClient.ResultSetParser.class));
+            eq("SHOW SCHEMAS IN IDENTIFIER(?) LIMIT 1"),
+            any(JdbcSnowflakeClient.ResultSetParser.class),
+            eq("\"DB_1\""));
     verify(mockQueryHarness)
         .query(
             eq(mockConnection),
-            eq("SHOW SCHEMAS LIKE '_SCHEMA_1$_________' IN DATABASE IDENTIFIER(?)"),
+            eq("SHOW TABLES IN IDENTIFIER(?) LIMIT 1"),
             any(JdbcSnowflakeClient.ResultSetParser.class),
-            eq("DB_1"));
+            eq("\"DB_1\".\"$SCHEMA_1$.!@#%^&*\""));
   }
 
   @Test
-  public void testSchemaDoesntExistMismatchDatabase() throws SQLException {
-    when(mockResultSet.next()).thenReturn(true).thenReturn(false);
-    when(mockResultSet.getString("name")).thenReturn("DBZ1");
-
-    Assertions.assertThat(
-            snowflakeClient.schemaExists(SnowflakeIdentifier.ofSchema("DB_1", "SCHEMA_1")))
-        .isFalse();
-  }
-
-  @Test
-  public void testSchemaDoesntExistNoSchemaFound() throws SQLException {
-    when(mockResultSet.next()).thenReturn(true).thenReturn(false).thenReturn(false);
-    when(mockResultSet.getString("name")).thenReturn("DB_1");
-
-    Assertions.assertThat(
-            snowflakeClient.schemaExists(SnowflakeIdentifier.ofSchema("DB_1", "SCHEMA_1")))
-        .isFalse();
-  }
-
-  @Test
-  public void testSchemaDoesntExistSchemaMismatch() throws SQLException {
+  public void testSchemaDoesntExistNoSchemaFoundException() throws SQLException {
     when(mockResultSet.next())
-        .thenReturn(true)
-        .thenReturn(false)
-        .thenReturn(true)
-        .thenReturn(false);
-    when(mockResultSet.getString("name")).thenReturn("DB_1").thenReturn("SCHEMAZ1");
-    when(mockResultSet.getString("database_name")).thenReturn("DB_1");
+        .thenThrow(new SQLException("Schema does not exists", "2000", 2003, null));
 
     Assertions.assertThat(
             snowflakeClient.schemaExists(SnowflakeIdentifier.ofSchema("DB_1", "SCHEMA_1")))
         .isFalse();
+  }
+
+  @Test
+  public void testSchemaFailureWithOtherException() throws SQLException {
+    when(mockResultSet.next()).thenThrow(new SQLException("Some other exception", "2000", 2, null));
+
+    Assertions.assertThatExceptionOfType(UncheckedSQLException.class)
+        .isThrownBy(
+            () -> snowflakeClient.schemaExists(SnowflakeIdentifier.ofSchema("DB_1", "SCHEMA_1")));
   }
 
   @Test
@@ -285,7 +269,7 @@ public class JdbcSnowflakeClientTest {
             eq(mockConnection),
             eq("SHOW SCHEMAS IN DATABASE IDENTIFIER(?)"),
             any(JdbcSnowflakeClient.ResultSetParser.class),
-            eq("DB_1"));
+            eq("\"DB_1\""));
 
     Assertions.assertThat(actualList)
         .containsExactly(
@@ -393,7 +377,7 @@ public class JdbcSnowflakeClientTest {
             eq(mockConnection),
             eq("SHOW ICEBERG TABLES IN DATABASE IDENTIFIER(?)"),
             any(JdbcSnowflakeClient.ResultSetParser.class),
-            eq("DB_1"));
+            eq("\"DB_1\""));
 
     Assertions.assertThat(actualList)
         .containsExactly(
@@ -421,7 +405,7 @@ public class JdbcSnowflakeClientTest {
             eq(mockConnection),
             eq("SHOW ICEBERG TABLES IN SCHEMA IDENTIFIER(?)"),
             any(JdbcSnowflakeClient.ResultSetParser.class),
-            eq("DB_1.SCHEMA_1"));
+            eq("" + "\"DB_1\".\"SCHEMA_1\""));
 
     Assertions.assertThat(actualList)
         .containsExactly(
@@ -476,7 +460,7 @@ public class JdbcSnowflakeClientTest {
             eq(mockConnection),
             eq("SELECT SYSTEM$GET_ICEBERG_TABLE_INFORMATION(?) AS METADATA"),
             any(JdbcSnowflakeClient.ResultSetParser.class),
-            eq("DB_1.SCHEMA_1.TABLE_1"));
+            eq("\"DB_1\".\"SCHEMA_1\".\"TABLE_1\""));
 
     SnowflakeTableMetadata expectedMetadata =
         new SnowflakeTableMetadata(
@@ -507,7 +491,7 @@ public class JdbcSnowflakeClientTest {
             eq(mockConnection),
             eq("SELECT SYSTEM$GET_ICEBERG_TABLE_INFORMATION(?) AS METADATA"),
             any(JdbcSnowflakeClient.ResultSetParser.class),
-            eq("DB_1.SCHEMA_1.TABLE_1"));
+            eq("\"DB_1\".\"SCHEMA_1\".\"TABLE_1\""));
 
     SnowflakeTableMetadata expectedMetadata =
         new SnowflakeTableMetadata(
@@ -538,7 +522,7 @@ public class JdbcSnowflakeClientTest {
             eq(mockConnection),
             eq("SELECT SYSTEM$GET_ICEBERG_TABLE_INFORMATION(?) AS METADATA"),
             any(JdbcSnowflakeClient.ResultSetParser.class),
-            eq("DB_1.SCHEMA_1.TABLE_1"));
+            eq("\"DB_1\".\"SCHEMA_1\".\"TABLE_1\""));
 
     SnowflakeTableMetadata expectedMetadata =
         new SnowflakeTableMetadata(
