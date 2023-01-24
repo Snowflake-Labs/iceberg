@@ -145,13 +145,15 @@ class SnowflakeIdentifier {
     // case-insensitive. More details could be found here.
     // https://docs.snowflake.com/en/sql-reference/identifiers-syntax.html
     //
-    // Identifiers with single and double qoutes are not supported.
     Pattern noSpecialChars = Pattern.compile("[^a-z0-9]", Pattern.CASE_INSENSITIVE);
     Matcher check = noSpecialChars.matcher(identifier);
     String sanitized = identifier;
     if (check.find()) {
 
-      // Database names with single or double quotes are not supported
+      // Escape double quotes correctly
+      sanitized = sanitized.replace("\"", "\"\"");
+
+      // Add double quotes to evaluate identifier as quoted
       sanitized = "\"" + sanitized + "\"";
     }
     return sanitized;
