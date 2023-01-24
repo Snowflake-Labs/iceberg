@@ -143,7 +143,7 @@ class JdbcSnowflakeClient implements SnowflakeClient {
         "databaseExists requires a DATABASE identifier, got '%s'",
         database);
 
-    final String finalQuery = "SHOW SCHEMAS IN IDENTIFIER(?) LIMIT 1";
+    final String finalQuery = "SHOW SCHEMAS IN DATABASE IDENTIFIER(?) LIMIT 1";
 
     List<SnowflakeIdentifier> schemas;
     try {
@@ -179,7 +179,7 @@ class JdbcSnowflakeClient implements SnowflakeClient {
       return false;
     }
 
-    final String finalQuery = "SHOW TABLES IN IDENTIFIER(?) LIMIT 1";
+    final String finalQuery = "SHOW TABLES IN SCHEMA IDENTIFIER(?) LIMIT 1";
 
     List<SnowflakeIdentifier> schemas;
     try {

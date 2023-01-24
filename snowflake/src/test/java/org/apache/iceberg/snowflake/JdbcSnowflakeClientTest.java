@@ -88,7 +88,7 @@ public class JdbcSnowflakeClientTest {
     verify(mockQueryHarness)
         .query(
             eq(mockConnection),
-            eq("SHOW SCHEMAS IN IDENTIFIER(?) LIMIT 1"),
+            eq("SHOW SCHEMAS IN DATABASE IDENTIFIER(?) LIMIT 1"),
             any(JdbcSnowflakeClient.ResultSetParser.class),
             eq("\"DB_1\""));
   }
@@ -106,7 +106,7 @@ public class JdbcSnowflakeClientTest {
     verify(mockQueryHarness)
         .query(
             eq(mockConnection),
-            eq("SHOW SCHEMAS IN IDENTIFIER(?) LIMIT 1"),
+            eq("SHOW SCHEMAS IN DATABASE IDENTIFIER(?) LIMIT 1"),
             any(JdbcSnowflakeClient.ResultSetParser.class),
             eq("\"$DB_1$.!@#%^&*\""));
   }
@@ -138,13 +138,13 @@ public class JdbcSnowflakeClientTest {
     verify(mockQueryHarness)
         .query(
             eq(mockConnection),
-            eq("SHOW SCHEMAS IN IDENTIFIER(?) LIMIT 1"),
+            eq("SHOW SCHEMAS IN DATABASE IDENTIFIER(?) LIMIT 1"),
             any(JdbcSnowflakeClient.ResultSetParser.class),
             eq("DB1"));
     verify(mockQueryHarness)
         .query(
             eq(mockConnection),
-            eq("SHOW TABLES IN IDENTIFIER(?) LIMIT 1"),
+            eq("SHOW TABLES IN SCHEMA IDENTIFIER(?) LIMIT 1"),
             any(JdbcSnowflakeClient.ResultSetParser.class),
             eq("DB1.SCHEMA1"));
   }
@@ -168,13 +168,13 @@ public class JdbcSnowflakeClientTest {
     verify(mockQueryHarness)
         .query(
             eq(mockConnection),
-            eq("SHOW SCHEMAS IN IDENTIFIER(?) LIMIT 1"),
+            eq("SHOW SCHEMAS IN DATABASE IDENTIFIER(?) LIMIT 1"),
             any(JdbcSnowflakeClient.ResultSetParser.class),
             eq("\"DB_1\""));
     verify(mockQueryHarness)
         .query(
             eq(mockConnection),
-            eq("SHOW TABLES IN IDENTIFIER(?) LIMIT 1"),
+            eq("SHOW TABLES IN SCHEMA IDENTIFIER(?) LIMIT 1"),
             any(JdbcSnowflakeClient.ResultSetParser.class),
             eq("\"DB_1\".\"$SCHEMA_1$.!@#%^&*\""));
   }
