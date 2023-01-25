@@ -151,10 +151,7 @@ class JdbcSnowflakeClient implements SnowflakeClient {
           connectionPool.run(
               conn ->
                   queryHarness.query(
-                      conn,
-                      finalQuery,
-                      SCHEMA_RESULT_SET_HANDLER,
-                      SnowflakeIdentifier.toIdentifierString(database.databaseName())));
+                      conn, finalQuery, SCHEMA_RESULT_SET_HANDLER, database.databaseName()));
     } catch (SQLException e) {
       if (e.getErrorCode() == 2003 && e.getMessage().contains("does not exist")) {
         return false;

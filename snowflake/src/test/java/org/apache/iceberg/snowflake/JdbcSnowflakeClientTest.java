@@ -90,25 +90,7 @@ public class JdbcSnowflakeClientTest {
             eq(mockConnection),
             eq("SHOW SCHEMAS IN DATABASE IDENTIFIER(?) LIMIT 1"),
             any(JdbcSnowflakeClient.ResultSetParser.class),
-            eq("\"DB_1\""));
-  }
-
-  @Test
-  public void testDatabaseExistsSpecialCharacters() throws SQLException {
-    when(mockResultSet.next()).thenReturn(true).thenReturn(false);
-    when(mockResultSet.getString("database_name")).thenReturn("$DB_1$.!@#%^&*");
-    when(mockResultSet.getString("name")).thenReturn("SCHEMA_1");
-
-    Assertions.assertThat(
-            snowflakeClient.databaseExists(SnowflakeIdentifier.ofDatabase("$DB_1$.!@#%^&*")))
-        .isTrue();
-
-    verify(mockQueryHarness)
-        .query(
-            eq(mockConnection),
-            eq("SHOW SCHEMAS IN DATABASE IDENTIFIER(?) LIMIT 1"),
-            any(JdbcSnowflakeClient.ResultSetParser.class),
-            eq("\"$DB_1$.!@#%^&*\""));
+            eq("DB_1"));
   }
 
   @Test
@@ -147,36 +129,6 @@ public class JdbcSnowflakeClientTest {
             eq("SHOW TABLES IN SCHEMA IDENTIFIER(?) LIMIT 1"),
             any(JdbcSnowflakeClient.ResultSetParser.class),
             eq("DB1.SCHEMA1"));
-  }
-
-  @Test
-  public void testSchemaExistsSpecialCharacters() throws SQLException {
-    when(mockResultSet.next())
-        .thenReturn(true)
-        .thenReturn(false)
-        .thenReturn(true)
-        .thenReturn(false);
-    when(mockResultSet.getString("name")).thenReturn("$SCHEMA_1$.!@#%^&*").thenReturn("Table1");
-    when(mockResultSet.getString("database_name")).thenReturn("DB_1").thenReturn("DB_1");
-    when(mockResultSet.getString("schema_name")).thenReturn("$SCHEMA_1$.!@#%^&*");
-
-    Assertions.assertThat(
-            snowflakeClient.schemaExists(
-                SnowflakeIdentifier.ofSchema("DB_1", "$SCHEMA_1$.!@#%^&*")))
-        .isTrue();
-
-    verify(mockQueryHarness)
-        .query(
-            eq(mockConnection),
-            eq("SHOW SCHEMAS IN DATABASE IDENTIFIER(?) LIMIT 1"),
-            any(JdbcSnowflakeClient.ResultSetParser.class),
-            eq("\"DB_1\""));
-    verify(mockQueryHarness)
-        .query(
-            eq(mockConnection),
-            eq("SHOW TABLES IN SCHEMA IDENTIFIER(?) LIMIT 1"),
-            any(JdbcSnowflakeClient.ResultSetParser.class),
-            eq("\"DB_1\".\"$SCHEMA_1$.!@#%^&*\""));
   }
 
   @Test
@@ -269,7 +221,7 @@ public class JdbcSnowflakeClientTest {
             eq(mockConnection),
             eq("SHOW SCHEMAS IN DATABASE IDENTIFIER(?)"),
             any(JdbcSnowflakeClient.ResultSetParser.class),
-            eq("\"DB_1\""));
+            eq("DB_1"));
 
     Assertions.assertThat(actualList)
         .containsExactly(
@@ -377,7 +329,7 @@ public class JdbcSnowflakeClientTest {
             eq(mockConnection),
             eq("SHOW ICEBERG TABLES IN DATABASE IDENTIFIER(?)"),
             any(JdbcSnowflakeClient.ResultSetParser.class),
-            eq("\"DB_1\""));
+            eq("DB_1"));
 
     Assertions.assertThat(actualList)
         .containsExactly(
@@ -405,7 +357,7 @@ public class JdbcSnowflakeClientTest {
             eq(mockConnection),
             eq("SHOW ICEBERG TABLES IN SCHEMA IDENTIFIER(?)"),
             any(JdbcSnowflakeClient.ResultSetParser.class),
-            eq("" + "\"DB_1\".\"SCHEMA_1\""));
+            eq("" + "DB_1.SCHEMA_1"));
 
     Assertions.assertThat(actualList)
         .containsExactly(
@@ -460,7 +412,7 @@ public class JdbcSnowflakeClientTest {
             eq(mockConnection),
             eq("SELECT SYSTEM$GET_ICEBERG_TABLE_INFORMATION(?) AS METADATA"),
             any(JdbcSnowflakeClient.ResultSetParser.class),
-            eq("\"DB_1\".\"SCHEMA_1\".\"TABLE_1\""));
+            eq("DB_1.SCHEMA_1.TABLE_1"));
 
     SnowflakeTableMetadata expectedMetadata =
         new SnowflakeTableMetadata(
@@ -491,7 +443,7 @@ public class JdbcSnowflakeClientTest {
             eq(mockConnection),
             eq("SELECT SYSTEM$GET_ICEBERG_TABLE_INFORMATION(?) AS METADATA"),
             any(JdbcSnowflakeClient.ResultSetParser.class),
-            eq("\"DB_1\".\"SCHEMA_1\".\"TABLE_1\""));
+            eq("DB_1.SCHEMA_1.TABLE_1"));
 
     SnowflakeTableMetadata expectedMetadata =
         new SnowflakeTableMetadata(
@@ -522,7 +474,7 @@ public class JdbcSnowflakeClientTest {
             eq(mockConnection),
             eq("SELECT SYSTEM$GET_ICEBERG_TABLE_INFORMATION(?) AS METADATA"),
             any(JdbcSnowflakeClient.ResultSetParser.class),
-            eq("\"DB_1\".\"SCHEMA_1\".\"TABLE_1\""));
+            eq("DB_1.SCHEMA_1.TABLE_1"));
 
     SnowflakeTableMetadata expectedMetadata =
         new SnowflakeTableMetadata(

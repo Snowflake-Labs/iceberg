@@ -18,9 +18,6 @@
  */
 package org.apache.iceberg.snowflake;
 
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import org.apache.iceberg.relocated.com.google.common.annotations.VisibleForTesting;
 import org.apache.iceberg.relocated.com.google.common.base.Objects;
 import org.apache.iceberg.relocated.com.google.common.base.Preconditions;
 
@@ -119,44 +116,14 @@ class SnowflakeIdentifier {
   public String toIdentifierString() {
     switch (type()) {
       case TABLE:
-        return String.format(
-            "%s.%s.%s",
-            toIdentifierString(databaseName),
-            toIdentifierString(schemaName),
-            toIdentifierString(tableName));
+        return String.format("%s.%s.%s", databaseName, schemaName, tableName);
       case SCHEMA:
-        return String.format(
-            "%s.%s", toIdentifierString(databaseName), toIdentifierString(schemaName));
+        return String.format("%s.%s", databaseName, schemaName);
       case DATABASE:
-        return toIdentifierString(databaseName);
+        return databaseName;
       default:
         return "";
     }
-  }
-
-  /**
-   * Returns the supplied identifier String as a String suitable for use in a Snowflake IDENTIFIER
-   * param.
-   */
-  @VisibleForTesting
-  static String toIdentifierString(String identifier) {
-    // Identifier with special characters are case-sensitive while regular identifiers (no special
-    // characters) are
-    // case-insensitive. More details could be found here.
-    // https://docs.snowflake.com/en/sql-reference/identifiers-syntax.html
-    //
-    Pattern noSpecialChars = Pattern.compile("[^a-z0-9]", Pattern.CASE_INSENSITIVE);
-    Matcher check = noSpecialChars.matcher(identifier);
-    String sanitized = identifier;
-    if (check.find()) {
-
-      // Escape double quotes correctly
-      sanitized = sanitized.replace("\"", "\"\"");
-
-      // Add double quotes to evaluate identifier as quoted
-      sanitized = "\"" + sanitized + "\"";
-    }
-    return sanitized;
   }
 
   @Override
