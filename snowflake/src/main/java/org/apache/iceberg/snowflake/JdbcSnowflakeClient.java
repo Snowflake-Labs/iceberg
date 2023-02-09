@@ -153,7 +153,7 @@ class JdbcSnowflakeClient implements SnowflakeClient {
                   queryHarness.query(
                       conn, finalQuery, SCHEMA_RESULT_SET_HANDLER, database.databaseName()));
     } catch (SQLException e) {
-      if (e.getErrorCode() == 2003 && e.getMessage().contains("does not exist")) {
+      if (e.getErrorCode() == 2003 ) { // || e.getErrorCode() == 2001 || e.getErrorCode() == 2043) {
         return false;
       }
       throw new UncheckedSQLException(e, "Failed to check if database '%s' exists", database);
@@ -186,7 +186,7 @@ class JdbcSnowflakeClient implements SnowflakeClient {
                   queryHarness.query(
                       conn, finalQuery, TABLE_RESULT_SET_HANDLER, schema.toIdentifierString()));
     } catch (SQLException e) {
-      if (e.getErrorCode() == 2003 && e.getMessage().contains("does not exist")) {
+      if (e.getErrorCode() == 2003 ) { //|| e.getErrorCode() == 2001 || e.getErrorCode() == 2043) {
         return false;
       }
       throw new UncheckedSQLException(e, "Failed to check if schema '%s' exists", schema);
