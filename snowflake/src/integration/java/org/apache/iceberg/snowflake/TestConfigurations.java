@@ -58,18 +58,8 @@ class TestConfigurations {
     return properties.get("jdbc.database");
   }
 
-  String getExternalVolume() {
-    return properties.get("externalVolume");
-  }
-
   Map<String, String> getProperties() {
     return properties;
-  }
-
-  Map<String, String> getJdbcProperties() {
-    Map<String, String> jdbcProps = new HashMap<String, String>();
-    properties.forEach((k, v) -> jdbcProps.put("jdbc." + k, v));
-    return jdbcProps;
   }
 
   static synchronized TestConfigurations getInstance() {
