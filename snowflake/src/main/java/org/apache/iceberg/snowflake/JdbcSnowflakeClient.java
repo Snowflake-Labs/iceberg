@@ -197,11 +197,7 @@ class JdbcSnowflakeClient implements SnowflakeClient {
                   queryHarness.query(
                       conn, finalQuery, TABLE_RESULT_SET_HANDLER, schema.toIdentifierString()));
     } catch (SQLException e) {
-<<<<<<< HEAD
-      if (e.getErrorCode() == 2003 ) { //|| e.getErrorCode() == 2001 || e.getErrorCode() == 2043) {
-=======
       if (SCHEMA_NOT_FOUND_ERROR_CODES.contains(e.getErrorCode())) {
->>>>>>> Feature-Error-Handling
         return false;
       }
       throw new UncheckedSQLException(e, "Failed to check if schema '%s' exists", schema);
