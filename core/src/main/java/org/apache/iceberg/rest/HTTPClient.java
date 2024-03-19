@@ -26,10 +26,12 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import org.apache.hc.client5.http.classic.methods.HttpUriRequest;
 import org.apache.hc.client5.http.classic.methods.HttpUriRequestBase;
+import org.apache.hc.client5.http.config.ConnectionConfig;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
 import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
@@ -78,6 +80,8 @@ public class HTTPClient implements RESTClient {
   private static final int REST_MAX_CONNECTIONS_DEFAULT = 100;
   private static final String REST_MAX_CONNECTIONS_PER_ROUTE = "rest.client.connections-per-route";
   private static final int REST_MAX_CONNECTIONS_PER_ROUTE_DEFAULT = 100;
+  private static final String REST_CONNECTION_TIMEOUT = "rest.client.connection-timeout";
+  private static final String REST_SOCKET_TIMEOUT = "rest.client.socket-timeout";
 
   private final String uri;
   private final CloseableHttpClient httpClient;
@@ -94,9 +98,23 @@ public class HTTPClient implements RESTClient {
 
     HttpClientBuilder clientBuilder = HttpClients.custom();
 
+    String connectionTimeout = properties.get(REST_CONNECTION_TIMEOUT);
+    String socketTimeout = properties.get(REST_SOCKET_TIMEOUT);
+
+    ConnectionConfig.Builder connConfigBuilder = ConnectionConfig.custom();
+
+    if (connectionTimeout != null) {
+      connConfigBuilder.setConnectTimeout(Long.parseLong(connectionTimeout), TimeUnit.SECONDS);
+    }
+
+    if (socketTimeout != null) {
+      connConfigBuilder.setSocketTimeout(Integer.parseInt(socketTimeout), TimeUnit.SECONDS);
+    }
+
     HttpClientConnectionManager connectionManager =
         PoolingHttpClientConnectionManagerBuilder.create()
             .useSystemProperties()
+            .setDefaultConnectionConfig(connConfigBuilder.build())
             .setMaxConnTotal(Integer.getInteger(REST_MAX_CONNECTIONS, REST_MAX_CONNECTIONS_DEFAULT))
             .setMaxConnPerRoute(
                 PropertyUtil.propertyAsInt(
