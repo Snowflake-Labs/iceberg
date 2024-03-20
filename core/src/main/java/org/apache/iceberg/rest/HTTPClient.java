@@ -39,6 +39,7 @@ import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.HttpHeaders;
+import org.apache.hc.core5.http.HttpHost;
 import org.apache.hc.core5.http.HttpRequestInterceptor;
 import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.Method;
@@ -85,6 +86,7 @@ public class HTTPClient implements RESTClient {
 
   private HTTPClient(
       String uri,
+      HttpHost proxy,
       Map<String, String> baseHeaders,
       ObjectMapper objectMapper,
       HttpRequestInterceptor requestInterceptor,
@@ -104,6 +106,7 @@ public class HTTPClient implements RESTClient {
                     REST_MAX_CONNECTIONS_PER_ROUTE,
                     REST_MAX_CONNECTIONS_PER_ROUTE_DEFAULT))
             .build();
+
     clientBuilder.setConnectionManager(connectionManager);
 
     if (baseHeaders != null) {
@@ -119,6 +122,10 @@ public class HTTPClient implements RESTClient {
 
     int maxRetries = PropertyUtil.propertyAsInt(properties, REST_MAX_RETRIES, 5);
     clientBuilder.setRetryStrategy(new ExponentialHttpRequestRetryStrategy(maxRetries));
+
+    if (proxy != null) {
+      clientBuilder.setProxy(proxy);
+    }
 
     this.httpClient = clientBuilder.build();
   }
@@ -457,6 +464,7 @@ public class HTTPClient implements RESTClient {
     private final Map<String, String> baseHeaders = Maps.newHashMap();
     private String uri;
     private ObjectMapper mapper = RESTObjectMapper.mapper();
+    private HttpHost proxy = null;
 
     private Builder(Map<String, String> properties) {
       this.properties = properties;
@@ -465,6 +473,12 @@ public class HTTPClient implements RESTClient {
     public Builder uri(String path) {
       Preconditions.checkNotNull(path, "Invalid uri for http client: null");
       this.uri = RESTUtil.stripTrailingSlash(path);
+      return this;
+    }
+
+    public Builder withProxy(String hostIp) {
+      Preconditions.checkNotNull(hostIp, "Invalid hostIp for http client proxy: null");
+      this.proxy = new HttpHost(hostIp);
       return this;
     }
 
@@ -493,7 +507,7 @@ public class HTTPClient implements RESTClient {
         interceptor = loadInterceptorDynamically(SIGV4_REQUEST_INTERCEPTOR_IMPL, properties);
       }
 
-      return new HTTPClient(uri, baseHeaders, mapper, interceptor, properties);
+      return new HTTPClient(uri, proxy, baseHeaders, mapper, interceptor, properties);
     }
   }
 
