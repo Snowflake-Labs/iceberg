@@ -93,23 +93,12 @@ public class HTTPClient implements RESTClient {
       ObjectMapper objectMapper,
       HttpRequestInterceptor requestInterceptor,
       Map<String, String> properties,
-      ConnectionConfig connectionConfig) {
+      HttpClientConnectionManager connectionManager) {
     this.uri = uri;
     this.mapper = objectMapper;
 
     HttpClientBuilder clientBuilder = HttpClients.custom();
 
-    HttpClientConnectionManager connectionManager =
-        PoolingHttpClientConnectionManagerBuilder.create()
-            .useSystemProperties()
-            .setDefaultConnectionConfig(connectionConfig)
-            .setMaxConnTotal(Integer.getInteger(REST_MAX_CONNECTIONS, REST_MAX_CONNECTIONS_DEFAULT))
-            .setMaxConnPerRoute(
-                PropertyUtil.propertyAsInt(
-                    properties,
-                    REST_MAX_CONNECTIONS_PER_ROUTE,
-                    REST_MAX_CONNECTIONS_PER_ROUTE_DEFAULT))
-            .build();
     clientBuilder.setConnectionManager(connectionManager);
 
     if (baseHeaders != null) {
@@ -454,11 +443,29 @@ public class HTTPClient implements RESTClient {
     return instance;
   }
 
+  static HttpClientConnectionManager getConnectionManager(
+      Map<String, String> properties, ConnectionConfig connectionConfig) {
+    PoolingHttpClientConnectionManagerBuilder connectionManagerBuilder =
+        PoolingHttpClientConnectionManagerBuilder.create();
+    if (connectionConfig != null) {
+      connectionManagerBuilder.setDefaultConnectionConfig(connectionConfig);
+    }
+    return connectionManagerBuilder
+        .useSystemProperties()
+        .setMaxConnTotal(Integer.getInteger(REST_MAX_CONNECTIONS, REST_MAX_CONNECTIONS_DEFAULT))
+        .setMaxConnPerRoute(
+            PropertyUtil.propertyAsInt(
+                properties, REST_MAX_CONNECTIONS_PER_ROUTE, REST_MAX_CONNECTIONS_PER_ROUTE_DEFAULT))
+        .build();
+  }
+
   @VisibleForTesting
   static ConnectionConfig getConnectionConfig(Map<String, String> properties) {
     Long connectionTimeout =
         PropertyUtil.propertyAsNullableLong(properties, REST_CONNECTION_TIMEOUT);
     Integer socketTimeout = PropertyUtil.propertyAsNullableInt(properties, REST_SOCKET_TIMEOUT);
+
+    if (connectionTimeout == null && socketTimeout == null) return null;
 
     ConnectionConfig.Builder connConfigBuilder = ConnectionConfig.custom();
 
@@ -518,7 +525,10 @@ public class HTTPClient implements RESTClient {
 
       ConnectionConfig connectionConfig = getConnectionConfig(properties);
 
-      return new HTTPClient(uri, baseHeaders, mapper, interceptor, properties, connectionConfig);
+      HttpClientConnectionManager connectionManager =
+          getConnectionManager(properties, connectionConfig);
+
+      return new HTTPClient(uri, baseHeaders, mapper, interceptor, properties, connectionManager);
     }
   }
 
