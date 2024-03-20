@@ -98,17 +98,17 @@ public class HTTPClient implements RESTClient {
 
     HttpClientBuilder clientBuilder = HttpClients.custom();
 
-    String connectionTimeout = properties.get(REST_CONNECTION_TIMEOUT);
-    String socketTimeout = properties.get(REST_SOCKET_TIMEOUT);
+    Long connectionTimeout = PropertyUtil.propertyAsNullableLong(properties, REST_CONNECTION_TIMEOUT);
+    Integer socketTimeout = PropertyUtil.propertyAsNullableInt(properties, REST_SOCKET_TIMEOUT);
 
     ConnectionConfig.Builder connConfigBuilder = ConnectionConfig.custom();
 
     if (connectionTimeout != null) {
-      connConfigBuilder.setConnectTimeout(Long.parseLong(connectionTimeout), TimeUnit.SECONDS);
+      connConfigBuilder.setConnectTimeout(connectionTimeout, TimeUnit.SECONDS);
     }
 
     if (socketTimeout != null) {
-      connConfigBuilder.setSocketTimeout(Integer.parseInt(socketTimeout), TimeUnit.SECONDS);
+      connConfigBuilder.setSocketTimeout(socketTimeout, TimeUnit.SECONDS);
     }
 
     HttpClientConnectionManager connectionManager =
