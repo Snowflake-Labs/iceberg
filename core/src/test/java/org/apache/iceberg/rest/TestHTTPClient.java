@@ -35,6 +35,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
+import org.apache.hc.client5.http.config.ConnectionConfig;
 import org.apache.hc.core5.http.EntityDetails;
 import org.apache.hc.core5.http.HttpException;
 import org.apache.hc.core5.http.HttpRequestInterceptor;
@@ -131,6 +132,21 @@ public class TestHTTPClient {
 
     assertThat(interceptor).isInstanceOf(TestHttpRequestInterceptor.class);
     assertThat(((TestHttpRequestInterceptor) interceptor).properties).isEqualTo(properties);
+  }
+
+  @Test
+  public void testHttpClientGetConnectionConfig() {
+    long connectionTimeout = 10000L;
+    int socketTimeout = 100;
+    Map<String, String> properties =
+        ImmutableMap.of(
+            HTTPClient.REST_CONNECTION_TIMEOUT, String.valueOf(connectionTimeout),
+            HTTPClient.REST_SOCKET_TIMEOUT, String.valueOf(socketTimeout));
+
+    ConnectionConfig connectionConfig = HTTPClient.getConnectionConfig(properties);
+
+    assertThat(connectionConfig.getConnectTimeout().getDuration()).isEqualTo(connectionTimeout);
+    assertThat(connectionConfig.getSocketTimeout().getDuration()).isEqualTo(socketTimeout);
   }
 
   public static void testHttpMethodOnSuccess(HttpMethod method) throws JsonProcessingException {
