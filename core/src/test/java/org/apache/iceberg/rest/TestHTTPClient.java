@@ -50,6 +50,7 @@ import org.junit.jupiter.api.Test;
 import org.mockserver.integration.ClientAndServer;
 import org.mockserver.model.HttpRequest;
 import org.mockserver.model.HttpResponse;
+import org.mockserver.verify.VerificationTimes;
 
 /**
  * * Exercises the RESTClient interface, specifically over a mocked-server using the actual
@@ -119,6 +120,38 @@ public class TestHTTPClient {
   @Test
   public void testHeadFailure() throws JsonProcessingException {
     testHttpMethodOnFailure(HttpMethod.HEAD);
+  }
+
+  /** Tests that requests go via the proxy server in case the client is set up with one */
+  @Test
+  public void testHttpClientProxyServerInteraction() throws IOException {
+    int proxyPort = 1070;
+    String proxyHostName = "localhost";
+    try (ClientAndServer proxyServer = startClientAndServer(proxyPort);
+        RESTClient clientWithProxy =
+            HTTPClient.builder(ImmutableMap.of())
+                .uri(URI)
+                .withProxy(proxyHostName, proxyPort)
+                .build()) {
+      //  Set up the servers to match against a provided request
+      String path = "v1/config";
+
+      HttpRequest mockRequest =
+          request("/" + path).withMethod(HttpMethod.HEAD.name().toUpperCase(Locale.ROOT));
+
+      HttpResponse mockResponse = response().withStatusCode(200);
+
+      mockServer.when(mockRequest).respond(mockResponse);
+      proxyServer.when(mockRequest).respond(mockResponse);
+
+      restClient.head(path, ImmutableMap.of(), (onError) -> {});
+      mockServer.verify(mockRequest, VerificationTimes.exactly(1));
+      proxyServer.verify(mockRequest, VerificationTimes.never());
+
+      // Validate that the proxy server is hit only if the client is set up with one
+      clientWithProxy.head(path, ImmutableMap.of(), (onError) -> {});
+      proxyServer.verify(mockRequest, VerificationTimes.exactly(1));
+    }
   }
 
   @Test
