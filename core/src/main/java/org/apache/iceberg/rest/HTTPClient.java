@@ -465,7 +465,9 @@ public class HTTPClient implements RESTClient {
         PropertyUtil.propertyAsNullableLong(properties, REST_CONNECTION_TIMEOUT);
     Integer socketTimeout = PropertyUtil.propertyAsNullableInt(properties, REST_SOCKET_TIMEOUT);
 
-    if (connectionTimeout == null && socketTimeout == null) return null;
+    if (connectionTimeout == null && socketTimeout == null) {
+      return null;
+    }
 
     ConnectionConfig.Builder connConfigBuilder = ConnectionConfig.custom();
 
