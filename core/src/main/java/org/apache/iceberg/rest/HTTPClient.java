@@ -477,7 +477,7 @@ public class HTTPClient implements RESTClient {
     }
 
     public Builder withProxy(String hostname, int port) {
-      Preconditions.checkNotNull(hostname, "Invalid hostIp for http client proxy: null");
+      Preconditions.checkNotNull(hostname, "Invalid hostname for http client proxy: null");
       this.proxy = new HttpHost(hostname, port);
       return this;
     }
