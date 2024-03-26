@@ -527,10 +527,13 @@ public class HTTPClient implements RESTClient {
 
       ConnectionConfig connectionConfig = getConnectionConfig(properties);
 
-      HttpClientConnectionManager connectionManager =
-          getConnectionManager(properties, connectionConfig);
-
-      return new HTTPClient(uri, baseHeaders, mapper, interceptor, properties, connectionManager);
+      return new HTTPClient(
+          uri,
+          baseHeaders,
+          mapper,
+          interceptor,
+          properties,
+          getConnectionManager(properties, connectionConfig));
     }
   }
 

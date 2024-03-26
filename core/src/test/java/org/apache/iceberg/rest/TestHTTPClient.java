@@ -31,9 +31,11 @@ import static org.mockserver.model.HttpResponse.response;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
+import java.net.SocketTimeoutException;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import org.apache.hc.client5.http.config.ConnectionConfig;
 import org.apache.hc.core5.http.EntityDetails;
@@ -136,17 +138,45 @@ public class TestHTTPClient {
 
   @Test
   public void testHttpClientGetConnectionConfig() {
-    long connectionTimeout = 10000L;
-    int socketTimeout = 100;
+    long connectionTimeout = 10L;
+    int socketTimeout = 10;
     Map<String, String> properties =
         ImmutableMap.of(
             HTTPClient.REST_CONNECTION_TIMEOUT, String.valueOf(connectionTimeout),
             HTTPClient.REST_SOCKET_TIMEOUT, String.valueOf(socketTimeout));
 
     ConnectionConfig connectionConfig = HTTPClient.getConnectionConfig(properties);
-
+    assertThat(connectionConfig).isNotNull();
     assertThat(connectionConfig.getConnectTimeout().getDuration()).isEqualTo(connectionTimeout);
     assertThat(connectionConfig.getSocketTimeout().getDuration()).isEqualTo(socketTimeout);
+  }
+
+  @Test
+  public void testHttpClientWithSocketTimeout() throws IOException {
+    long socketTimeoutSec = 2L;
+    Map<String, String> properties =
+        ImmutableMap.of(HTTPClient.REST_SOCKET_TIMEOUT, String.valueOf(socketTimeoutSec));
+    String path = "socket/timeout/path";
+
+    try (HTTPClient client = HTTPClient.builder(properties).uri(URI).build()) {
+
+      HttpRequest mockRequest =
+          request()
+              .withPath("/" + path)
+              .withMethod(HttpMethod.HEAD.name().toUpperCase(Locale.ROOT));
+      // Setting a response delay of 5 seconds to simulate hitting the configured socket timeout of
+      // 2 seconds
+      HttpResponse mockResponse =
+          response()
+              .withStatusCode(200)
+              .withBody("Delayed response")
+              .withDelay(TimeUnit.SECONDS, 5);
+      mockServer.when(mockRequest).respond(mockResponse);
+
+      Assertions.assertThatThrownBy(() -> client.head(path, ImmutableMap.of(), (unused) -> {}))
+          .cause()
+          .isInstanceOf(SocketTimeoutException.class);
+    }
   }
 
   public static void testHttpMethodOnSuccess(HttpMethod method) throws JsonProcessingException {
