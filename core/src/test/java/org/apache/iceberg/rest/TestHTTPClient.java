@@ -38,6 +38,7 @@ import java.util.function.Consumer;
 import org.apache.hc.core5.http.EntityDetails;
 import org.apache.hc.core5.http.HttpException;
 import org.apache.hc.core5.http.HttpRequestInterceptor;
+import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.protocol.HttpContext;
 import org.apache.iceberg.IcebergBuild;
 import org.apache.iceberg.relocated.com.google.common.collect.ImmutableMap;
@@ -47,6 +48,7 @@ import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockserver.configuration.Configuration;
 import org.mockserver.integration.ClientAndServer;
 import org.mockserver.model.HttpRequest;
 import org.mockserver.model.HttpResponse;
@@ -151,6 +153,53 @@ public class TestHTTPClient {
       // Validate that the proxy server is hit only if the client is set up with one
       clientWithProxy.head(path, ImmutableMap.of(), (onError) -> {});
       proxyServer.verify(mockRequest, VerificationTimes.exactly(1));
+    }
+  }
+
+  /** Negative test for basic username password authentication on the proxy server */
+  @Test
+  public void testHttpClientProxyAuthenticationFailure() throws IOException {
+    int proxyPort = 1070;
+    String proxyHostName = "localhost";
+    String authorizedUsername = "test-username";
+    String authorizedPassword = "test-password";
+
+    try (ClientAndServer proxyServer =
+            startClientAndServer(
+                new Configuration()
+                    .proxyAuthenticationUsername(authorizedUsername)
+                    .proxyAuthenticationPassword(authorizedPassword),
+                proxyPort);
+
+        // Let's build a client with incorrect password
+        RESTClient clientWithProxy =
+            HTTPClient.builder(ImmutableMap.of())
+                .uri(URI)
+                .withProxy(proxyHostName, proxyPort)
+                .withProxyBasicAuthentication("test-username", "incorrect-password")
+                .build()) {
+
+      ErrorHandler onError =
+          new ErrorHandler() {
+            @Override
+            public ErrorResponse parseResponse(int code, String responseBody) {
+              return null;
+            }
+
+            @Override
+            public void accept(ErrorResponse errorResponse) {
+              throw new RuntimeException(errorResponse.message() + " - " + errorResponse.code());
+            }
+          };
+
+      int expectedErrorCode = HttpStatus.SC_PROXY_AUTHENTICATION_REQUIRED;
+      String expectedErrorMsg = "Proxy Authentication Required";
+
+      // Validate that we hit a 407 Proxy Authentication Required exception
+      Assertions.assertThatThrownBy(
+              () -> clientWithProxy.get("v1/config", Item.class, ImmutableMap.of(), onError))
+          .isInstanceOf(RuntimeException.class)
+          .hasMessage(String.format("%s - %s", expectedErrorMsg, expectedErrorCode));
     }
   }
 

@@ -28,8 +28,12 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import org.apache.hc.client5.http.auth.AuthScope;
+import org.apache.hc.client5.http.auth.CredentialsProvider;
+import org.apache.hc.client5.http.auth.UsernamePasswordCredentials;
 import org.apache.hc.client5.http.classic.methods.HttpUriRequest;
 import org.apache.hc.client5.http.classic.methods.HttpUriRequestBase;
+import org.apache.hc.client5.http.impl.auth.BasicCredentialsProvider;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
 import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
@@ -87,6 +91,7 @@ public class HTTPClient implements RESTClient {
   private HTTPClient(
       String uri,
       HttpHost proxy,
+      CredentialsProvider credsProvider,
       Map<String, String> baseHeaders,
       ObjectMapper objectMapper,
       HttpRequestInterceptor requestInterceptor,
@@ -124,6 +129,9 @@ public class HTTPClient implements RESTClient {
     clientBuilder.setRetryStrategy(new ExponentialHttpRequestRetryStrategy(maxRetries));
 
     if (proxy != null) {
+      if (credsProvider != null) {
+        clientBuilder.setDefaultCredentialsProvider(credsProvider);
+      }
       clientBuilder.setProxy(proxy);
     }
 
@@ -464,7 +472,9 @@ public class HTTPClient implements RESTClient {
     private final Map<String, String> baseHeaders = Maps.newHashMap();
     private String uri;
     private ObjectMapper mapper = RESTObjectMapper.mapper();
-    private HttpHost proxy = null;
+    private HttpHost proxy;
+    private String proxyUsername;
+    private String proxyPassword;
 
     private Builder(Map<String, String> properties) {
       this.properties = properties;
@@ -479,6 +489,14 @@ public class HTTPClient implements RESTClient {
     public Builder withProxy(String hostname, int port) {
       Preconditions.checkNotNull(hostname, "Invalid hostname for http client proxy: null");
       this.proxy = new HttpHost(hostname, port);
+      return this;
+    }
+
+    public Builder withProxyBasicAuthentication(String username, String password) {
+      Preconditions.checkNotNull(username, "Invalid username for http client proxy: null");
+      Preconditions.checkNotNull(password, "Invalid password for http client proxy: null");
+      this.proxyUsername = username;
+      this.proxyPassword = password;
       return this;
     }
 
@@ -507,7 +525,17 @@ public class HTTPClient implements RESTClient {
         interceptor = loadInterceptorDynamically(SIGV4_REQUEST_INTERCEPTOR_IMPL, properties);
       }
 
-      return new HTTPClient(uri, proxy, baseHeaders, mapper, interceptor, properties);
+      BasicCredentialsProvider credsProvider = null;
+
+      if (proxy != null && proxyUsername != null && proxyPassword != null) {
+        credsProvider = new BasicCredentialsProvider();
+        credsProvider.setCredentials(
+            new AuthScope(proxy),
+            new UsernamePasswordCredentials(proxyUsername, proxyPassword.toCharArray()));
+      }
+
+      return new HTTPClient(
+          uri, proxy, credsProvider, baseHeaders, mapper, interceptor, properties);
     }
   }
 
