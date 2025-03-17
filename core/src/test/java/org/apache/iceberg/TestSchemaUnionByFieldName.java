@@ -26,6 +26,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.iceberg.relocated.com.google.common.collect.Lists;
+import org.apache.iceberg.types.EdgeAlgorithm;
 import org.apache.iceberg.types.Type.PrimitiveType;
 import org.apache.iceberg.types.Types;
 import org.apache.iceberg.types.Types.BinaryType;
@@ -35,6 +36,8 @@ import org.apache.iceberg.types.Types.DecimalType;
 import org.apache.iceberg.types.Types.DoubleType;
 import org.apache.iceberg.types.Types.FixedType;
 import org.apache.iceberg.types.Types.FloatType;
+import org.apache.iceberg.types.Types.GeographyType;
+import org.apache.iceberg.types.Types.GeometryType;
 import org.apache.iceberg.types.Types.IntegerType;
 import org.apache.iceberg.types.Types.ListType;
 import org.apache.iceberg.types.Types.LongType;
@@ -63,7 +66,11 @@ public class TestSchemaUnionByFieldName {
         FixedType.ofLength(10),
         DecimalType.of(10, 2),
         LongType.get(),
-        FloatType.get());
+        FloatType.get(),
+        GeometryType.crs84(),
+        GeometryType.of("srid:3857"),
+        GeographyType.crs84(),
+        GeographyType.of("srid:4269", EdgeAlgorithm.KARNEY));
   }
 
   private static NestedField[] primitiveFields(

@@ -395,6 +395,10 @@ public class TypeUtil {
     return visit(schema, new FindTypeVisitor(predicate));
   }
 
+  public static Type find(Type type, Predicate<Type> predicate) {
+    return visit(type, new FindTypeVisitor(predicate));
+  }
+
   public static boolean isPromotionAllowed(Type from, Type.PrimitiveType to) {
     // Warning! Before changing this function, make sure that the type change doesn't introduce
     // compatibility problems in partitioning.
@@ -535,6 +539,12 @@ public class TypeUtil {
         return ((Types.FixedType) type).length();
       case BINARY:
       case VARIANT:
+        return 80;
+      case GEOMETRY:
+      case GEOGRAPHY:
+        // 80 bytes is an approximate size for a polygon or linestring with 4 to 5 coordinates.
+        // This is a reasonable estimate for the size of a geometry or geography object without
+        // additional details.
         return 80;
       case DECIMAL:
         // 12 (header) + (12 + 12 + 4) (BigInteger) + 4 (scale) = 44 bytes
@@ -709,8 +719,8 @@ public class TypeUtil {
       return null;
     }
 
-    public T variant() {
-      return null;
+    public T variant(Types.VariantType variant) {
+      throw new UnsupportedOperationException("Unsupported type: variant");
     }
 
     public T primitive(Type.PrimitiveType primitive) {
@@ -790,7 +800,7 @@ public class TypeUtil {
             new VisitFuture<>(map.valueType(), visitor));
 
       case VARIANT:
-        return visitor.variant();
+        return visitor.variant(type.asVariantType());
 
       default:
         return visitor.primitive(type.asPrimitiveType());

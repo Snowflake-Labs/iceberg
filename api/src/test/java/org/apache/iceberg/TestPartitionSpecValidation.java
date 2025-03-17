@@ -26,6 +26,8 @@ import org.apache.iceberg.transforms.Transforms;
 import org.apache.iceberg.types.Types;
 import org.apache.iceberg.types.Types.NestedField;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 public class TestPartitionSpecValidation {
   private static final Schema SCHEMA =
@@ -36,7 +38,9 @@ public class TestPartitionSpecValidation {
           NestedField.required(4, "d", Types.TimestampType.withZone()),
           NestedField.required(5, "another_d", Types.TimestampType.withZone()),
           NestedField.required(6, "s", Types.StringType.get()),
-          NestedField.required(7, "v", Types.VariantType.get()));
+          NestedField.required(7, "v", Types.VariantType.get()),
+          NestedField.required(8, "geom", Types.GeometryType.crs84()),
+          NestedField.required(9, "geog", Types.GeographyType.crs84()));
 
   @Test
   public void testMultipleTimestampPartitions() {
@@ -315,14 +319,23 @@ public class TestPartitionSpecValidation {
     assertThat(spec.lastAssignedFieldId()).isEqualTo(1006);
   }
 
-  @Test
-  public void testVariantUnsupported() {
+  @ParameterizedTest
+  @MethodSource("unsupportedFieldsProvider")
+  public void testUnsupported(int fieldId, String partitionName, String expectedErrorMessage) {
     assertThatThrownBy(
             () ->
                 PartitionSpec.builderFor(SCHEMA)
-                    .add(7, 1005, "variant_partition1", Transforms.bucket(5))
+                    .add(fieldId, 1005, partitionName, Transforms.bucket(5))
                     .build())
         .isInstanceOf(ValidationException.class)
-        .hasMessage("Cannot partition by non-primitive source field: variant");
+        .hasMessage(expectedErrorMessage);
+  }
+
+  private static Object[][] unsupportedFieldsProvider() {
+    return new Object[][] {
+      {7, "variant_partition1", "Cannot partition by non-primitive source field: variant"},
+      {8, "geom_partition1", "Invalid source type geometry for transform: bucket[5]"},
+      {9, "geog_partition1", "Invalid source type geography for transform: bucket[5]"}
+    };
   }
 }

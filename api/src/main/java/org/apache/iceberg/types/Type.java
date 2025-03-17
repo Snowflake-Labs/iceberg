@@ -43,6 +43,8 @@ public interface Type extends Serializable {
     FIXED(ByteBuffer.class),
     BINARY(ByteBuffer.class),
     DECIMAL(BigDecimal.class),
+    GEOMETRY(ByteBuffer.class),
+    GEOGRAPHY(ByteBuffer.class),
     STRUCT(StructLike.class),
     LIST(List.class),
     MAP(Map.class),
@@ -79,6 +81,10 @@ public interface Type extends Serializable {
 
   default Types.MapType asMapType() {
     throw new IllegalArgumentException("Not a map type: " + this);
+  }
+
+  default Types.VariantType asVariantType() {
+    throw new IllegalArgumentException("Not a variant type: " + this);
   }
 
   default boolean isNestedType() {

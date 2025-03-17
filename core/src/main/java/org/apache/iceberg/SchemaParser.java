@@ -125,14 +125,8 @@ public class SchemaParser {
     generator.writeEndObject();
   }
 
-  static void toJson(Type.PrimitiveType primitive, JsonGenerator generator) throws IOException {
-    generator.writeString(primitive.toString());
-  }
-
   static void toJson(Type type, JsonGenerator generator) throws IOException {
-    if (type.isPrimitiveType()) {
-      toJson(type.asPrimitiveType(), generator);
-    } else if (type.isVariantType()) {
+    if (type.isPrimitiveType() || type.isVariantType()) {
       generator.writeString(type.toString());
     } else {
       Type.NestedType nested = type.asNestedType();
